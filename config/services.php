@@ -39,6 +39,40 @@ return [
         'api_key' => env('PIXELFORGE_API_KEY'),
         'base_url' => env('PIXELFORGE_BASE_URL', 'https://pixelforge.promptedit.dev/v1'),
         'webhook_secret' => env('PIXELFORGE_WEBHOOK_SECRET', 'whsec_local_secret'),
+
+        /*
+        | Queued submission of generations (see App\Jobs\SubmitGeneration).
+        */
+        'submission' => [
+            // Total attempts before a generation that Pixelforge never accepted is
+            // failed (at no cost). Pixelforge asks callers to cap retries.
+            'max_attempts' => (int) env('PIXELFORGE_SUBMISSION_MAX_ATTEMPTS', 6),
+
+            // Minimum seconds to wait before attempt 2, 3, ... (comma separated; the
+            // last value repeats). A longer Retry-After from Pixelforge always wins.
+            'backoff' => array_values(array_map('intval', array_filter(
+                explode(',', (string) env('PIXELFORGE_SUBMISSION_BACKOFF', '5,15,30,60,120')),
+                fn (string $seconds) => trim($seconds) !== '',
+            ))),
+
+            // How many submission jobs may run at the same time across all workers.
+            // Set to 0 to remove the limit.
+            'max_concurrent' => (int) env('PIXELFORGE_SUBMISSION_MAX_CONCURRENT', 3),
+
+            // How long a job waits for a free slot before going back on the queue.
+            'concurrency_wait' => (int) env('PIXELFORGE_SUBMISSION_CONCURRENCY_WAIT', 10),
+
+            // Safety expiry (seconds) of a slot, in case a worker dies while holding it.
+            // Keep it above the HTTP timeout.
+            'concurrency_lock_ttl' => (int) env('PIXELFORGE_SUBMISSION_LOCK_TTL', 60),
+
+            // How long a generation's uniqueness lock lasts, covering all retries.
+            'unique_for' => (int) env('PIXELFORGE_SUBMISSION_UNIQUE_FOR', 900),
+
+            // Queue (and connection) submission jobs are dispatched to; null = defaults.
+            'queue' => env('PIXELFORGE_SUBMISSION_QUEUE'),
+            'connection' => env('PIXELFORGE_SUBMISSION_CONNECTION'),
+        ],
     ],
 
 ];

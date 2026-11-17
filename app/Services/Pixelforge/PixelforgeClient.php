@@ -54,7 +54,13 @@ class PixelforgeClient
     }
 
     /**
-     * Submit an asynchronous image generation request.
+     * Submit an asynchronous image generation request (a single attempt).
+     *
+     * This never retries or sleeps. Rate limits and overloads surface as
+     * PixelforgeRateLimitException / PixelforgeOverloadedException carrying the
+     * Retry-After value, and the caller (the queued SubmitGeneration job) decides
+     * when to try again. Pass the same idempotency key on every attempt so a retry
+     * can never create a second generation.
      *
      * @param  array{
      *     prompt: string,
@@ -64,52 +70,24 @@ class PixelforgeClient
      *     metadata?: array<string, string>,
      * }  $payload
      * @return array<string, mixed>
+     *
+     * @throws PixelforgeException
      */
-    public function createGeneration(
-        array $payload,
-        ?string $idempotencyKey = null,
-        int $maxRetries = 2,
-    ): array {
-        $attempts = 0;
+    public function createGeneration(array $payload, ?string $idempotencyKey = null): array
+    {
+        $request = $this->authenticatedRequest();
 
-        while ($attempts <= $maxRetries) {
-            $attempts++;
-
-            $request = $this->authenticatedRequest();
-
-            if ($idempotencyKey !== null && $idempotencyKey !== '') {
-                $request->withHeaders(['Idempotency-Key' => $idempotencyKey]);
-            }
-
-            $response = $request->post("{$this->baseUrl}/generations", $payload);
-
-            if ($response->status() === 202) {
-                return $response->json();
-            }
-
-            // If 503 overloaded and we have retries left, wait and retry
-            if ($response->status() === 503 && $attempts <= $maxRetries) {
-                $retryAfter = (int) ($response->header('Retry-After') ?: 2);
-                sleep(min($retryAfter, 5));
-
-                continue;
-            }
-
-            // If 429 concurrency limit and we have retries left, wait and retry once
-            if ($response->status() === 429) {
-                $errorCode = $response->json('error.code');
-                if ($errorCode === 'concurrency_limit_exceeded' && $attempts <= $maxRetries) {
-                    $retryAfter = (int) ($response->header('Retry-After') ?: 5);
-                    sleep(min($retryAfter, 5));
-
-                    continue;
-                }
-            }
-
-            throw $this->parseException($response);
+        if ($idempotencyKey !== null && $idempotencyKey !== '') {
+            $request->withHeaders(['Idempotency-Key' => $idempotencyKey]);
         }
 
-        throw new PixelforgeOverloadedException('Failed to create generation after retries.');
+        $response = $request->post("{$this->baseUrl}/generations", $payload);
+
+        if ($response->status() === 202) {
+            return $response->json();
+        }
+
+        throw $this->parseException($response);
     }
 
     /**

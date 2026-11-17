@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\GenerationStatus;
+use App\Jobs\Middleware\LimitConcurrency;
 use App\Models\Generation;
 use App\Services\Pixelforge\Exceptions\PixelforgeException;
 use App\Services\Pixelforge\Exceptions\PixelforgeOverloadedException;
@@ -25,16 +26,46 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
     use Queueable;
 
     /**
-     * Pixelforge asks callers to cap retries and give up after a few attempts.
+     * Name of the concurrency limit shared by every SubmitGeneration job.
      */
-    public int $tries = 6;
+    public const CONCURRENCY_KEY = 'pixelforge-submit';
+
+    /**
+     * Total attempts (services.pixelforge.submission.max_attempts). Pixelforge asks
+     * callers to cap retries, so a generation it never accepts is eventually failed.
+     */
+    public int $tries;
 
     /**
      * Keep the uniqueness lock for as long as the job could still be retrying.
      */
-    public int $uniqueFor = 900;
+    public int $uniqueFor;
 
-    public function __construct(public readonly string $generationId) {}
+    public function __construct(public readonly string $generationId)
+    {
+        $this->tries = max(1, (int) config('services.pixelforge.submission.max_attempts', 6));
+        $this->uniqueFor = (int) config('services.pixelforge.submission.unique_for', 900);
+
+        $this->onConnection(config('services.pixelforge.submission.connection'));
+        $this->onQueue(config('services.pixelforge.submission.queue'));
+    }
+
+    /**
+     * At most services.pixelforge.submission.max_concurrent of these jobs run at once.
+     *
+     * @return array<int, object>
+     */
+    public function middleware(): array
+    {
+        return [
+            new LimitConcurrency(
+                name: self::CONCURRENCY_KEY,
+                limit: (int) config('services.pixelforge.submission.max_concurrent', 3),
+                waitSeconds: (int) config('services.pixelforge.submission.concurrency_wait', 10),
+                lockSeconds: (int) config('services.pixelforge.submission.concurrency_lock_ttl', 60),
+            ),
+        ];
+    }
 
     public function uniqueId(): string
     {
@@ -42,13 +73,16 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Seconds to wait between attempts when Pixelforge gives no Retry-After.
+     * Minimum seconds to wait before each retry (services.pixelforge.submission.backoff).
+     * A longer Retry-After from Pixelforge always takes precedence.
      *
      * @return array<int, int>
      */
     public function backoff(): array
     {
-        return [5, 15, 30, 60, 120];
+        $backoff = (array) config('services.pixelforge.submission.backoff', [5, 15, 30, 60, 120]);
+
+        return $backoff === [] ? [5] : array_values(array_map('intval', $backoff));
     }
 
     public function handle(PixelforgeClient $pixelforge): void
@@ -64,7 +98,6 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
             $response = $pixelforge->createGeneration(
                 payload: $this->payload($generation),
                 idempotencyKey: $generation->idempotency_key,
-                maxRetries: 0, // retries are the queue's job, not a sleep() in a worker
             );
         } catch (PixelforgeOverloadedException $e) {
             $this->retryLater($generation, $e, $e->retryAfter);
