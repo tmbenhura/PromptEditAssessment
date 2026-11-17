@@ -162,19 +162,31 @@ class WebhookProcessor
             $providerCost = $this->costCalculator->calculateActualProviderCost($usage, $rates);
             $userCost = $this->costCalculator->calculateActualUserCost($providerCost);
 
-            $generation->status = GenerationStatus::Succeeded;
-            $generation->image_url = $data['image_url'] ?? null;
-            $generation->image_url_expires_at = ! empty($data['image_url_expires_at']) ? Carbon::parse((string) $data['image_url_expires_at']) : null;
-            $generation->usage = $usage;
-            $generation->rates = $rates;
-            $generation->actual_provider_cost = $providerCost;
-            $generation->actual_user_cost = $userCost;
-            $generation->pixelforge_started_at = ! empty($data['started_at']) ? Carbon::parse((string) $data['started_at']) : $generation->pixelforge_started_at;
-            $generation->pixelforge_completed_at = ! empty($data['completed_at']) ? Carbon::parse((string) $data['completed_at']) : now();
-            $generation->save();
+            // Marking the generation succeeded releases its reservation, and charging
+            // the user deducts the real cost. They must commit together, otherwise a
+            // concurrent request could see the credits as free between the two writes.
+            DB::transaction(function () use ($generation, $data, $usage, $rates, $providerCost, $userCost): void {
+                // Re-check under a lock so webhook and polling can't both settle it.
+                $current = Generation::query()->whereKey($generation->id)->lockForUpdate()->first();
 
-            // Deduct user balance exactly once
-            $this->chargeUserForGeneration($generation, $userCost);
+                if ($current === null || $current->status->isFinal()) {
+                    return;
+                }
+
+                $generation->status = GenerationStatus::Succeeded;
+                $generation->image_url = $data['image_url'] ?? null;
+                $generation->image_url_expires_at = ! empty($data['image_url_expires_at']) ? Carbon::parse((string) $data['image_url_expires_at']) : null;
+                $generation->usage = $usage;
+                $generation->rates = $rates;
+                $generation->actual_provider_cost = $providerCost;
+                $generation->actual_user_cost = $userCost;
+                $generation->pixelforge_started_at = ! empty($data['started_at']) ? Carbon::parse((string) $data['started_at']) : $generation->pixelforge_started_at;
+                $generation->pixelforge_completed_at = ! empty($data['completed_at']) ? Carbon::parse((string) $data['completed_at']) : now();
+                $generation->save();
+
+                // Deduct user balance exactly once
+                $this->chargeUserForGeneration($generation, $userCost);
+            });
 
             return;
         }

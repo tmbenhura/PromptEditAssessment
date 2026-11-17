@@ -30,6 +30,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<string, string>|null $rates
  * @property numeric-string $estimated_provider_cost
  * @property numeric-string $estimated_user_cost
+ * @property numeric-string $reserved_user_cost
  * @property numeric-string $actual_provider_cost
  * @property numeric-string $actual_user_cost
  * @property string|null $error_code
@@ -57,6 +58,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'rates',
     'estimated_provider_cost',
     'estimated_user_cost',
+    'reserved_user_cost',
     'actual_provider_cost',
     'actual_user_cost',
     'error_code',
@@ -88,6 +90,7 @@ class Generation extends Model
             'pixelforge_completed_at' => 'datetime',
             'estimated_provider_cost' => 'decimal:9',
             'estimated_user_cost' => 'decimal:9',
+            'reserved_user_cost' => 'decimal:9',
             'actual_provider_cost' => 'decimal:9',
             'actual_user_cost' => 'decimal:9',
         ];

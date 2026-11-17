@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\GenerationStatus;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -71,13 +72,39 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     }
 
     /**
+     * The most this user could still be charged for generations that are queued
+     * or processing. Their final cost is unknown until they finish, so the
+     * maximum possible cost is held against the balance.
+     *
+     * @return numeric-string
+     */
+    public function reservedBalance(): string
+    {
+        return $this->generations()
+            ->whereIn('status', GenerationStatus::pending())
+            ->get(['id', 'reserved_user_cost'])
+            ->reduce(
+                fn (string $total, Generation $generation) => bcadd($total, (string) $generation->reserved_user_cost, 9),
+                '0.000000000',
+            );
+    }
+
+    /**
+     * Balance the user can still spend: credits minus what pending generations may cost.
+     *
+     * @return numeric-string
+     */
+    public function availableBalance(): string
+    {
+        return bcsub($this->balance_usd ?? '0.000000000', $this->reservedBalance(), 9);
+    }
+
+    /**
      * @param  numeric-string  $amountUsd
      */
     public function hasSufficientBalance(string $amountUsd): bool
     {
-        $current = $this->balance_usd ?? '0.000000000';
-
-        return bccomp($current, $amountUsd, 9) >= 0;
+        return bccomp($this->availableBalance(), $amountUsd, 9) >= 0;
     }
 
     /**

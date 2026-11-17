@@ -13,6 +13,7 @@ use App\Services\Pixelforge\Exceptions\PixelforgeException;
 use App\Services\Pixelforge\PixelforgeClient;
 use App\Services\Pricing\CostCalculator;
 use App\Services\Webhooks\WebhookProcessor;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class GenerationService
@@ -55,39 +56,48 @@ class GenerationService
 
         $maxEstimatedUserCost = $estimates['user']['max_cost'];
 
-        // Enforce credit balance check
-        if (! $user->hasSufficientBalance($maxEstimatedUserCost)) {
-            throw new InsufficientBalanceException(
-                message: "You need at least \${$maxEstimatedUserCost} credits for this generation, but your current balance is \${$user->balance_usd}.",
-                requiredAmount: $maxEstimatedUserCost,
-                currentBalance: $user->balance_usd,
-            );
-        }
+        // Check the balance and reserve the money in one atomic step. Locking the
+        // user row serialises concurrent requests, so two submissions can never
+        // both be approved against the same credits.
+        return DB::transaction(function () use ($user, $prompt, $size, $quality, $referenceImages, $rates, $estimates, $maxEstimatedUserCost) {
+            $lockedUser = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
 
-        $generationId = (string) Str::uuid();
-        $idempotencyKey = (string) Str::uuid();
+            if (! $lockedUser->hasSufficientBalance($maxEstimatedUserCost)) {
+                $available = $lockedUser->availableBalance();
+                $held = $lockedUser->reservedBalance();
 
-        $generation = Generation::create([
-            'id' => $generationId,
-            'idempotency_key' => $idempotencyKey,
-            'user_id' => $user->id,
-            'prompt' => $prompt,
-            'size' => $size,
-            'quality' => $quality,
-            'reference_images' => $referenceImages,
-            'status' => GenerationStatus::Queued,
-            'rates' => $rates,
-            'estimated_provider_cost' => $estimates['provider']['estimated_cost'],
-            'estimated_user_cost' => $estimates['user']['estimated_cost'],
-            'actual_provider_cost' => '0.000000000',
-            'actual_user_cost' => '0.000000000',
-        ]);
+                throw new InsufficientBalanceException(
+                    message: "You need at least \${$maxEstimatedUserCost} in available credits for this generation, but only \${$available} is available"
+                        .(bccomp($held, '0', 9) > 0 ? " (\${$held} is held for generations still in progress)." : '.'),
+                    requiredAmount: $maxEstimatedUserCost,
+                    currentBalance: $available,
+                );
+            }
 
-        // Submitting to Pixelforge happens in a queued job so the request returns
-        // immediately and rate limits or overloads are retried off the request cycle.
-        SubmitGeneration::dispatch($generation->id)->afterCommit();
+            $generation = Generation::create([
+                'id' => (string) Str::uuid(),
+                'idempotency_key' => (string) Str::uuid(),
+                'user_id' => $lockedUser->id,
+                'prompt' => $prompt,
+                'size' => $size,
+                'quality' => $quality,
+                'reference_images' => $referenceImages,
+                'status' => GenerationStatus::Queued,
+                'rates' => $rates,
+                'estimated_provider_cost' => $estimates['provider']['estimated_cost'],
+                'estimated_user_cost' => $estimates['user']['estimated_cost'],
+                // Held against the balance until the generation reaches a final status.
+                'reserved_user_cost' => $maxEstimatedUserCost,
+                'actual_provider_cost' => '0.000000000',
+                'actual_user_cost' => '0.000000000',
+            ]);
 
-        return $generation;
+            // Submitting to Pixelforge happens in a queued job so the request returns
+            // immediately and rate limits or overloads are retried off the request cycle.
+            SubmitGeneration::dispatch($generation->id)->afterCommit();
+
+            return $generation;
+        });
     }
 
     /**

@@ -9,6 +9,16 @@ enum GenerationStatus: string
     case Succeeded = 'succeeded';
     case Failed = 'failed';
 
+    /**
+     * Statuses of generations that may still be charged to the user.
+     *
+     * @return array<int, self>
+     */
+    public static function pending(): array
+    {
+        return [self::Queued, self::Processing];
+    }
+
     public function isFinal(): bool
     {
         return match ($this) {

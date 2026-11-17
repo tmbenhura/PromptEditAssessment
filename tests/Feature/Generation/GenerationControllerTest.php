@@ -23,6 +23,8 @@ test('dashboard page renders for authenticated user with balance and rates', fun
         ->component('Dashboard')
         ->has('generations')
         ->where('balance', '25.000000000')
+        ->where('availableBalance', '25.000000000')
+        ->where('heldBalance', '0.000000000')
         ->has('rates')
         ->has('sizes')
         ->has('qualities')

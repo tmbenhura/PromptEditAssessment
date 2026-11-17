@@ -50,6 +50,8 @@ class GenerationIndexController extends Controller
         return Inertia::render('Dashboard', [
             'generations' => $generations,
             'balance' => (string) $user->balance_usd,
+            'availableBalance' => $user->availableBalance(),
+            'heldBalance' => $user->reservedBalance(),
             'rates' => $rates,
             'hasActiveGenerations' => $hasActive,
             'sizes' => array_map(fn (GenerationSize $size) => [

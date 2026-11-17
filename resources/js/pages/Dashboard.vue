@@ -91,6 +91,8 @@ interface QualityOption {
 const props = defineProps<{
     generations: PaginatedGenerations;
     balance: string;
+    availableBalance: string;
+    heldBalance: string;
     rates: Record<string, string>;
     hasActiveGenerations: boolean;
     sizes: SizeOption[];
@@ -186,7 +188,7 @@ const estimate = computed(() => {
 });
 
 const canAfford = computed(() => {
-    return Number(props.balance) >= estimate.value.maxUserCost;
+    return Number(props.availableBalance) >= estimate.value.maxUserCost;
 });
 
 function addReferenceImage() {
@@ -236,7 +238,7 @@ function checkAndPoll() {
     if (props.hasActiveGenerations && !pollTimer) {
         pollTimer = setInterval(() => {
             router.reload({
-                only: ['generations', 'hasActiveGenerations', 'balance'],
+                only: ['generations', 'hasActiveGenerations', 'balance', 'availableBalance', 'heldBalance'],
                 preserveScroll: true,
             });
         }, 4000);
@@ -275,7 +277,14 @@ onUnmounted(() => {
                 <div>
                     <div class="text-xs font-medium text-neutral-500">Available Credits</div>
                     <div class="font-mono text-xl font-bold text-neutral-900 dark:text-neutral-100">
-                        ${{ Number(balance).toFixed(4) }} USD
+                        ${{ Number(availableBalance).toFixed(4) }} USD
+                    </div>
+                    <div
+                        v-if="Number(heldBalance) > 0"
+                        class="text-xs text-neutral-500"
+                        data-test="held-balance"
+                    >
+                        ${{ Number(heldBalance).toFixed(4) }} held for generations in progress
                     </div>
                 </div>
             </div>
