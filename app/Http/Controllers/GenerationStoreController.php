@@ -4,10 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\InsufficientBalanceException;
 use App\Http\Requests\StoreGenerationRequest;
-use App\Models\Generation;
 use App\Services\Generation\GenerationService;
 use App\Services\Pixelforge\Exceptions\PixelforgeException;
-use App\Services\Pixelforge\Exceptions\PixelforgePolicyViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 
@@ -18,7 +16,7 @@ class GenerationStoreController extends Controller
     ) {}
 
     /**
-     * Store and dispatch a new generation request.
+     * Record a new generation and queue it for submission to Pixelforge.
      */
     public function __invoke(StoreGenerationRequest $request): RedirectResponse|JsonResponse
     {
@@ -34,7 +32,7 @@ class GenerationStoreController extends Controller
                 return response()->json([
                     'message' => 'Generation queued successfully.',
                     'generation' => $generation,
-                ], 201);
+                ], 202);
             }
 
             return back()->with('success', 'Generation created and queued!');
@@ -44,12 +42,6 @@ class GenerationStoreController extends Controller
             }
 
             return back()->withErrors(['balance' => $e->getMessage()]);
-        } catch (PixelforgePolicyViolationException $e) {
-            if ($request->wantsJson()) {
-                return response()->json(['error' => $e->getMessage()], 400);
-            }
-
-            return back()->withErrors(['prompt' => $e->getMessage()]);
         } catch (PixelforgeException $e) {
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], (int) ($e->getCode() ?: 500));

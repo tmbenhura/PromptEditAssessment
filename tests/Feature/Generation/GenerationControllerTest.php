@@ -3,9 +3,11 @@
 use App\Enums\GenerationQuality;
 use App\Enums\GenerationSize;
 use App\Enums\GenerationStatus;
+use App\Jobs\SubmitGeneration;
 use App\Models\Generation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -67,20 +69,56 @@ test('store generation requires sufficient credit balance', function () {
     expect(Generation::count())->toBe(0);
 });
 
-test('store generation rejects blocked content policy violation prompt', function () {
+test('store generation queues a submission job instead of calling Pixelforge inline', function () {
+    Queue::fake();
+
     $user = User::factory()->create([
         'balance_usd' => '50.000000000',
     ]);
 
-    // Using Pixelforge test keyword [blocked]
     $response = $this->actingAs($user)->post(route('generations.store'), [
-        'prompt' => 'A photo with [blocked] keyword',
+        'prompt' => 'A lighthouse on a cliff at dawn [succeed]',
         'size' => '1024x1024',
-        'quality' => 'medium',
+        'quality' => 'low',
     ]);
 
-    $response->assertSessionHasErrors('prompt');
-    expect(Generation::count())->toBe(0);
+    $response->assertSessionHasNoErrors();
+
+    $generation = Generation::query()->sole();
+
+    expect($generation->status)->toBe(GenerationStatus::Queued)
+        ->and($generation->pixelforge_id)->toBeNull()
+        ->and($generation->user_id)->toBe($user->id)
+        ->and($generation->actual_user_cost)->toBe('0.000000000');
+
+    Queue::assertPushed(
+        SubmitGeneration::class,
+        fn (SubmitGeneration $job) => $job->generationId === $generation->id,
+    );
+});
+
+test('store generation returns 202 for json requests', function () {
+    Queue::fake();
+
+    $user = User::factory()->create(['balance_usd' => '50.000000000']);
+
+    $this->actingAs($user)->postJson(route('generations.store'), [
+        'prompt' => 'A quiet harbour at night',
+    ])->assertAccepted()->assertJsonPath('generation.status', 'queued');
+
+    Queue::assertPushed(SubmitGeneration::class, 1);
+});
+
+test('insufficient balance never dispatches a job', function () {
+    Queue::fake();
+
+    $user = User::factory()->create(['balance_usd' => '0.000000000']);
+
+    $this->actingAs($user)->post(route('generations.store'), [
+        'prompt' => 'No credit here',
+    ])->assertSessionHasErrors('balance');
+
+    Queue::assertNothingPushed();
 });
 
 test('status endpoint returns generation status and syncs active generation', function () {

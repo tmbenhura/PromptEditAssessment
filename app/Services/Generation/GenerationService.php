@@ -6,14 +6,13 @@ use App\Enums\GenerationQuality;
 use App\Enums\GenerationSize;
 use App\Enums\GenerationStatus;
 use App\Exceptions\InsufficientBalanceException;
+use App\Jobs\SubmitGeneration;
 use App\Models\Generation;
 use App\Models\User;
 use App\Services\Pixelforge\Exceptions\PixelforgeException;
-use App\Services\Pixelforge\Exceptions\PixelforgePolicyViolationException;
 use App\Services\Pixelforge\PixelforgeClient;
 use App\Services\Pricing\CostCalculator;
 use App\Services\Webhooks\WebhookProcessor;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class GenerationService
@@ -25,7 +24,7 @@ class GenerationService
     ) {}
 
     /**
-     * Create and initiate an image generation.
+     * Record a new image generation and queue its submission to Pixelforge.
      *
      * @param  array{
      *     prompt: string,
@@ -84,38 +83,11 @@ class GenerationService
             'actual_user_cost' => '0.000000000',
         ]);
 
-        try {
-            $payload = [
-                'prompt' => $prompt,
-                'size' => $size->value,
-                'quality' => $quality->value,
-                'metadata' => [
-                    'app_generation_id' => $generationId,
-                    'user_id' => (string) $user->id,
-                ],
-            ];
+        // Submitting to Pixelforge happens in a queued job so the request returns
+        // immediately and rate limits or overloads are retried off the request cycle.
+        SubmitGeneration::dispatch($generation->id)->afterCommit();
 
-            if (! empty($referenceImages)) {
-                $payload['reference_images'] = $referenceImages;
-            }
-
-            $response = $this->pixelforgeClient->createGeneration($payload, $idempotencyKey);
-
-            $generation->update([
-                'pixelforge_id' => $response['id'] ?? null,
-                'rates' => $response['rates'] ?? $rates,
-                'pixelforge_created_at' => ! empty($response['created_at']) ? Carbon::parse($response['created_at']) : now(),
-            ]);
-
-            return $generation->fresh();
-        } catch (PixelforgePolicyViolationException $e) {
-            $generation->delete();
-            throw $e;
-        } catch (PixelforgeException $e) {
-            // If creation failed with an API error and wasn't accepted
-            $generation->delete();
-            throw $e;
-        }
+        return $generation;
     }
 
     /**
