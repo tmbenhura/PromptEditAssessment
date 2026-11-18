@@ -1,0 +1,24 @@
+<script setup lang="ts">
+import { Button } from '@/components/ui/button';
+import type { PaginatedGenerations } from '@/types';
+
+defineProps<{
+    generations: PaginatedGenerations;
+}>();
+</script>
+
+<template>
+    <div v-if="generations.last_page > 1" class="flex items-center justify-between pt-2">
+        <Button variant="outline" size="sm" :disabled="!generations.prev_page_url" as-child>
+            <a v-if="generations.prev_page_url" :href="generations.prev_page_url">Previous</a>
+            <span v-else>Previous</span>
+        </Button>
+        <span class="text-xs text-neutral-500">
+            Page {{ generations.current_page }} of {{ generations.last_page }}
+        </span>
+        <Button variant="outline" size="sm" :disabled="!generations.next_page_url" as-child>
+            <a v-if="generations.next_page_url" :href="generations.next_page_url">Next</a>
+            <span v-else>Next</span>
+        </Button>
+    </div>
+</template>
