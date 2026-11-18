@@ -204,3 +204,55 @@ test('a held generation is not resubmitted early by the reconcile command', func
 
     \Illuminate\Support\Facades\Queue::assertPushed(SubmitGeneration::class, 1);
 });
+
+test('a webhook that lands before the create call returns is matched and not undone by the response', function () {
+    $user = User::factory()->create(['balance_usd' => '10.000000000']);
+    $generation = Generation::factory()->create([
+        'user_id' => $user->id,
+        'status' => GenerationStatus::Queued,
+        'pixelforge_id' => null,
+        'reserved_user_cost' => '1.000000000',
+    ]);
+
+    // Pixelforge delivers the success webhook while our POST /v1/generations is still
+    // in flight; the response (which still says "queued") only comes back afterwards.
+    $client = new class($generation->id) extends PixelforgeClient
+    {
+        public function __construct(private string $generationId) {}
+
+        public function createGeneration(array $payload, ?string $idempotencyKey = null): array
+        {
+            app(\App\Services\Webhooks\WebhookProcessor::class)->process([
+                'id' => 'evt_early',
+                'type' => 'generation.succeeded',
+                'data' => ['object' => [
+                    'id' => 'gen_early',
+                    'status' => 'succeeded',
+                    'image_url' => 'https://pixelforge.promptedit.dev/images/early.png',
+                    'metadata' => ['app_generation_id' => $this->generationId],
+                    'usage' => ['input_text_tokens' => 10, 'input_image_tokens' => 0, 'output_tokens' => 280, 'reasoning_tokens' => 100],
+                    'rates' => ['input_text_tokens' => '5.00', 'input_image_tokens' => '10.00', 'output_tokens' => '40.00', 'reasoning_tokens' => '12.50'],
+                ]],
+            ]);
+
+            return [
+                'id' => 'gen_early',
+                'status' => 'queued',
+                'created_at' => '2026-11-18T10:00:00Z',
+                'rates' => ['input_text_tokens' => '5.00', 'input_image_tokens' => '10.00', 'output_tokens' => '40.00', 'reasoning_tokens' => '12.50'],
+            ];
+        }
+    };
+
+    (new SubmitGeneration($generation->id))->handle($client);
+
+    $generation->refresh();
+    $user->refresh();
+
+    expect($generation->status)->toBe(GenerationStatus::Succeeded)
+        ->and($generation->pixelforge_id)->toBe('gen_early')
+        ->and($generation->image_url)->not->toBeNull()
+        ->and($user->transactions()->where('type', 'generation_charge')->count())->toBe(1)
+        ->and($user->reservedBalance())->toBe('0.000000000')
+        ->and($user->balance_usd)->toBe(bcsub('10.000000000', $generation->actual_user_cost, 9));
+});
