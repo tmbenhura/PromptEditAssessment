@@ -4,8 +4,13 @@ use App\Enums\GenerationStatus;
 use App\Jobs\SubmitGeneration;
 use App\Models\Generation;
 use App\Models\User;
+use App\Services\Pixelforge\Exceptions\PixelforgeRateLimitException;
 use App\Services\Pixelforge\PixelforgeClient;
+use App\Services\Webhooks\WebhookProcessor;
+use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -68,7 +73,7 @@ test('job releases back onto the queue when pixelforge is overloaded', function 
     $generation = queuedGeneration('Please wait [overloaded]');
 
     $job = new SubmitGeneration($generation->id);
-    $queueJob = Mockery::mock(Illuminate\Contracts\Queue\Job::class)->shouldIgnoreMissing();
+    $queueJob = Mockery::mock(Job::class)->shouldIgnoreMissing();
     $queueJob->shouldReceive('attempts')->andReturn(1);
     $queueJob->shouldReceive('release')->once()->with(Mockery::on(fn ($delay) => $delay >= 2));
     $job->setJob($queueJob);
@@ -83,7 +88,7 @@ test('job marks the generation failed once attempts are exhausted', function () 
     $generation = queuedGeneration('Never works [overloaded]');
 
     $job = new SubmitGeneration($generation->id);
-    $queueJob = Mockery::mock(Illuminate\Contracts\Queue\Job::class)->shouldIgnoreMissing();
+    $queueJob = Mockery::mock(Job::class)->shouldIgnoreMissing();
     $queueJob->shouldReceive('attempts')->andReturn($job->tries);
     $queueJob->shouldReceive('release')->never();
     $job->setJob($queueJob);
@@ -122,7 +127,7 @@ function dailyLimitClient(): PixelforgeClient
         public function createGeneration(array $payload, ?string $idempotencyKey = null): array
         {
             // Pixelforge sends no Retry-After for this one.
-            throw new \App\Services\Pixelforge\Exceptions\PixelforgeRateLimitException(
+            throw new PixelforgeRateLimitException(
                 'The daily generation quota is used up.', 429, 5, 'daily_limit_exceeded', 'rate_limit_error',
             );
         }
@@ -132,20 +137,20 @@ function dailyLimitClient(): PixelforgeClient
 test('the next quota reset is the start of the next UTC day plus the margin', function () {
     config(['services.pixelforge.submission.daily_limit_buffer' => 30]);
 
-    $late = \Carbon\CarbonImmutable::parse('2026-11-18 23:59:50', 'UTC');
+    $late = CarbonImmutable::parse('2026-11-18 23:59:50', 'UTC');
     expect(SubmitGeneration::nextQuotaReset($late)->toDateTimeString())->toBe('2026-11-19 00:00:30');
 
     // Always the *next* day, even exactly at midnight, and whatever the input timezone.
-    $midnight = \Carbon\CarbonImmutable::parse('2026-11-19 00:00:00', 'UTC');
+    $midnight = CarbonImmutable::parse('2026-11-19 00:00:00', 'UTC');
     expect(SubmitGeneration::nextQuotaReset($midnight)->toDateTimeString())->toBe('2026-11-20 00:00:30');
 
-    $harare = \Carbon\CarbonImmutable::parse('2026-11-19 01:30:00', 'Africa/Harare'); // 23:30 UTC on the 18th
+    $harare = CarbonImmutable::parse('2026-11-19 01:30:00', 'Africa/Harare'); // 23:30 UTC on the 18th
     expect(SubmitGeneration::nextQuotaReset($harare)->toDateTimeString())->toBe('2026-11-19 00:00:30');
 });
 
 test('hitting the daily limit holds the generation until the next UTC day instead of failing it', function () {
-    \Illuminate\Support\Facades\Queue::fake();
-    $this->travelTo(\Carbon\CarbonImmutable::parse('2026-11-18 14:00:00', 'UTC'));
+    Queue::fake();
+    $this->travelTo(CarbonImmutable::parse('2026-11-18 14:00:00', 'UTC'));
 
     $generation = Generation::factory()->create([
         'status' => GenerationStatus::Queued,
@@ -161,14 +166,14 @@ test('hitting the daily limit holds the generation until the next UTC day instea
         ->and($generation->submit_after->utc()->toDateTimeString())->toBe('2026-11-19 00:00:30');
 
     // A fresh job (own attempt budget, own uniqueness key) is scheduled for then.
-    \Illuminate\Support\Facades\Queue::assertPushed(SubmitGeneration::class, fn ($job) => $job->generationId === $generation->id
+    Queue::assertPushed(SubmitGeneration::class, fn ($job) => $job->generationId === $generation->id
         && $job->wave === 1
         && $job->uniqueId() === $generation->id.':1'
         && $job->delay->utc()->toDateTimeString() === '2026-11-19 00:00:30');
 });
 
 test('a generation held for the daily limit keeps its credits reserved', function () {
-    \Illuminate\Support\Facades\Queue::fake();
+    Queue::fake();
 
     $user = User::factory()->create(['balance_usd' => '10.000000000']);
     $generation = Generation::factory()->create([
@@ -184,7 +189,7 @@ test('a generation held for the daily limit keeps its credits reserved', functio
 });
 
 test('a held generation is not resubmitted early by the reconcile command', function () {
-    \Illuminate\Support\Facades\Queue::fake();
+    Queue::fake();
 
     $generation = Generation::factory()->create([
         'status' => GenerationStatus::Queued,
@@ -195,12 +200,64 @@ test('a held generation is not resubmitted early by the reconcile command', func
 
     $this->artisan('generations:reconcile')->assertSuccessful();
 
-    \Illuminate\Support\Facades\Queue::assertNothingPushed();
+    Queue::assertNothingPushed();
 
     // Once the wait is over it is fair game again.
     $generation->forceFill(['submit_after' => now()->subMinute()])->saveQuietly();
 
     $this->artisan('generations:reconcile')->assertSuccessful();
 
-    \Illuminate\Support\Facades\Queue::assertPushed(SubmitGeneration::class, 1);
+    Queue::assertPushed(SubmitGeneration::class, 1);
+});
+
+test('a webhook that lands before the create call returns is matched and not undone by the response', function () {
+    $user = User::factory()->create(['balance_usd' => '10.000000000']);
+    $generation = Generation::factory()->create([
+        'user_id' => $user->id,
+        'status' => GenerationStatus::Queued,
+        'pixelforge_id' => null,
+        'reserved_user_cost' => '1.000000000',
+    ]);
+
+    // Pixelforge delivers the success webhook while our POST /v1/generations is still
+    // in flight; the response (which still says "queued") only comes back afterwards.
+    $client = new class($generation->id) extends PixelforgeClient
+    {
+        public function __construct(private string $generationId) {}
+
+        public function createGeneration(array $payload, ?string $idempotencyKey = null): array
+        {
+            app(WebhookProcessor::class)->process([
+                'id' => 'evt_early',
+                'type' => 'generation.succeeded',
+                'data' => ['object' => [
+                    'id' => 'gen_early',
+                    'status' => 'succeeded',
+                    'image_url' => 'https://pixelforge.promptedit.dev/images/early.png',
+                    'metadata' => ['app_generation_id' => $this->generationId],
+                    'usage' => ['input_text_tokens' => 10, 'input_image_tokens' => 0, 'output_tokens' => 280, 'reasoning_tokens' => 100],
+                    'rates' => ['input_text_tokens' => '5.00', 'input_image_tokens' => '10.00', 'output_tokens' => '40.00', 'reasoning_tokens' => '12.50'],
+                ]],
+            ]);
+
+            return [
+                'id' => 'gen_early',
+                'status' => 'queued',
+                'created_at' => '2026-11-18T10:00:00Z',
+                'rates' => ['input_text_tokens' => '5.00', 'input_image_tokens' => '10.00', 'output_tokens' => '40.00', 'reasoning_tokens' => '12.50'],
+            ];
+        }
+    };
+
+    (new SubmitGeneration($generation->id))->handle($client);
+
+    $generation->refresh();
+    $user->refresh();
+
+    expect($generation->status)->toBe(GenerationStatus::Succeeded)
+        ->and($generation->pixelforge_id)->toBe('gen_early')
+        ->and($generation->image_url)->not->toBeNull()
+        ->and($user->transactions()->where('type', 'generation_charge')->count())->toBe(1)
+        ->and($user->reservedBalance())->toBe('0.000000000')
+        ->and($user->balance_usd)->toBe(bcsub('10.000000000', $generation->actual_user_cost, 9));
 });
