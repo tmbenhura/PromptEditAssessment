@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Enums\GenerationQuality;
 use App\Enums\GenerationSize;
 use App\Enums\GenerationStatus;
-use App\Services\Generation\GenerationService;
 use App\Services\Pixelforge\PixelforgeClient;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,7 +13,6 @@ use Inertia\Response;
 class GenerationIndexController extends Controller
 {
     public function __construct(
-        protected GenerationService $generationService,
         protected PixelforgeClient $pixelforgeClient,
     ) {}
 
@@ -25,15 +23,6 @@ class GenerationIndexController extends Controller
     {
         $user = $request->user();
 
-        // Sync active generations if any exist
-        $activeGenerations = $user->generations()
-            ->whereIn('status', [GenerationStatus::Queued, GenerationStatus::Processing])
-            ->get();
-
-        foreach ($activeGenerations as $activeGen) {
-            $this->generationService->sync($activeGen);
-        }
-
         $generations = $user->generations()
             ->latest()
             ->paginate(15)
@@ -42,7 +31,7 @@ class GenerationIndexController extends Controller
         $rates = $this->pixelforgeClient->getRates();
 
         $hasActive = $user->generations()
-            ->whereIn('status', [GenerationStatus::Queued, GenerationStatus::Processing])
+            ->whereIn('status', GenerationStatus::pending())
             ->exists();
 
         return Inertia::render('Dashboard', [

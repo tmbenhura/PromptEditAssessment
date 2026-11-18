@@ -13,3 +13,9 @@ Schedule::command('webhook-events:prune')
     ->dailyAt((string) config('services.pixelforge.webhook_events.prune_at', '03:00'))
     ->onOneServer()
     ->withoutOverlapping();
+
+// Poll generations whose webhooks went missing, so held credits are always released.
+Schedule::command('generations:reconcile')
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();

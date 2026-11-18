@@ -13,6 +13,7 @@ use App\Services\Pixelforge\Exceptions\PixelforgeException;
 use App\Services\Pixelforge\PixelforgeClient;
 use App\Services\Pricing\CostCalculator;
 use App\Services\Webhooks\WebhookProcessor;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -113,7 +114,8 @@ class GenerationService
             $this->webhookProcessor->applyGenerationUpdate($generation, $data);
 
             return $generation->fresh();
-        } catch (PixelforgeException) {
+        } catch (PixelforgeException|ConnectionException) {
+            // Pixelforge is unreachable or doesn't know it: try again next time.
             return $generation;
         }
     }

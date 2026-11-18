@@ -77,6 +77,21 @@ return [
         ],
 
         /*
+        | Safety net for missed webhooks (see App\Console\Commands\ReconcileGenerations).
+        */
+        'reconcile' => [
+            // Poll an unfinished generation once it has had no update for this long.
+            'stale_after' => (int) env('PIXELFORGE_RECONCILE_STALE_AFTER', 120),
+
+            // Resubmit a never-accepted generation after this long. Keep it above
+            // submission.unique_for so a job that is still retrying is left alone.
+            'resubmit_after' => (int) env('PIXELFORGE_RECONCILE_RESUBMIT_AFTER', 900),
+
+            // Most generations handled per run, to stay well inside the 60/min API limit.
+            'max_per_run' => (int) env('PIXELFORGE_RECONCILE_MAX_PER_RUN', 30),
+        ],
+
+        /*
         | Webhook event log (see App\Console\Commands\PruneWebhookEvents).
         */
         'webhook_events' => [
