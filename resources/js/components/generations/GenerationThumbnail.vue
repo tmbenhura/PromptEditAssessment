@@ -1,24 +1,44 @@
 <script setup lang="ts">
-import { AlertCircle, Loader2, ZoomIn } from '@lucide/vue';
+import { AlertCircle, ImageOff, Loader2, ZoomIn } from '@lucide/vue';
+import { computed, ref } from 'vue';
 import type { Generation } from '@/types';
 
-defineProps<{
+const props = defineProps<{
     generation: Generation;
 }>();
 
 defineEmits<{
     preview: [imageUrl: string];
 }>();
+
+// Pixelforge's signed URLs stop working 24 hours after completion.
+const imageUnavailable = ref(false);
+const imageExpired = computed(
+    () =>
+        imageUnavailable.value ||
+        (props.generation.image_url_expires_at !== null &&
+            new Date(props.generation.image_url_expires_at) <= new Date()),
+);
 </script>
 
 <template>
     <div class="relative flex h-48 items-center justify-center overflow-hidden border-b bg-neutral-100 dark:bg-neutral-900 sm:w-48 sm:min-w-[192px] sm:border-b-0 sm:border-r">
-        <template v-if="generation.status === 'succeeded' && generation.image_url">
+        <div
+            v-if="generation.status === 'succeeded' && imageExpired"
+            class="flex flex-col items-center gap-1.5 p-4 text-center"
+        >
+            <ImageOff class="h-7 w-7 text-neutral-400" />
+            <span class="text-xs font-semibold text-neutral-600 dark:text-neutral-300">Image expired</span>
+            <span class="text-[10px] text-neutral-400">Pixelforge links last 24 hours</span>
+        </div>
+
+        <template v-else-if="generation.status === 'succeeded' && generation.image_url">
             <img
                 :src="generation.image_url"
                 :alt="generation.prompt"
                 class="h-full w-full cursor-pointer object-cover transition duration-500 ease-in hover:scale-105"
                 @click="$emit('preview', generation.image_url)"
+                @error="imageUnavailable = true"
             />
             <button
                 type="button"

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(config('auth.require_email_verification') ? ['auth', 'verified'] : ['auth'])->group(function () {
     Route::get('/dashboard', GenerationIndexController::class)->name('dashboard');
     Route::post('/generations', GenerationStoreController::class)->name('generations.store');
     Route::post('/generations/estimate', GenerationEstimateController::class)->name('generations.estimate');

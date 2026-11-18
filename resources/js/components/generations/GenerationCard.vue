@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { AlertCircle, Copy } from '@lucide/vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import GenerationStatusBadge from '@/components/generations/GenerationStatusBadge.vue';
 import GenerationThumbnail from '@/components/generations/GenerationThumbnail.vue';
 import { Card } from '@/components/ui/card';
@@ -17,6 +17,9 @@ defineEmits<{
 }>();
 
 const promptCopied = ref(false);
+const isPending = computed(
+    () => props.generation.status === 'queued' || props.generation.status === 'processing',
+);
 
 async function copyPrompt() {
     await navigator.clipboard.writeText(props.generation.prompt);
@@ -87,15 +90,9 @@ function formatTime(isoTimestamp: string): string {
 
                         <div>
                             <span class="text-neutral-400">Actual Cost: </span>
-                            <span
-                                class="font-mono font-semibold"
-                                :class="
-                                    generation.status === 'queued' || generation.status === 'processing'
-                                        ? 'text-neutral-400'
-                                        : 'text-neutral-900 dark:text-neutral-100'
-                                "
-                            >
-                                ${{ generation.status === 'failed' ? '0.0' : Number(generation.actual_user_cost).toFixed(6) }}
+                            <span v-if="isPending" class="text-neutral-400">Pending</span>
+                            <span v-else class="font-mono font-semibold text-neutral-900 dark:text-neutral-100">
+                                ${{ generation.status === 'failed' ? '0.000000' : Number(generation.actual_user_cost).toFixed(6) }}
                             </span>
                         </div>
                     </div>

@@ -114,4 +114,17 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Require Verified Email
+    |--------------------------------------------------------------------------
+    |
+    | When true, users must verify their email before using the app. Turn it off
+    | (REQUIRE_EMAIL_VERIFICATION=false) on a host with no outgoing mail, or new
+    | users would be stuck waiting for a link that never arrives.
+    |
+    */
+
+    'require_email_verification' => (bool) env('REQUIRE_EMAIL_VERIFICATION', true),
+
 ];
