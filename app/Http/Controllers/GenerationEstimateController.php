@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Enums\GenerationQuality;
 use App\Enums\GenerationSize;
 use App\Exceptions\PricingUnavailableException;
-use App\Services\Pricing\PricingProvider;
 use App\Services\Pricing\CostCalculator;
+use App\Services\Pricing\PricingProvider;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

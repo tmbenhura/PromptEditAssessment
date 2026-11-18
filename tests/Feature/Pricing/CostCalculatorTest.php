@@ -120,7 +120,6 @@ test('it estimates token counts and prices correctly', function () {
         ->and($estimate['user']['max_cost'])->toBe('0.467343750');
 });
 
-
 test('the markup multiplier comes from configuration', function (string $multiplier, string $expectedUserCost) {
     config(['services.pixelforge.markup_multiplier' => $multiplier]);
 

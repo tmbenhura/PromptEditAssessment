@@ -1,12 +1,15 @@
 <?php
 
 use App\Exceptions\PricingUnavailableException;
+use App\Models\Generation;
 use App\Models\PricingSnapshot;
+use App\Models\User;
 use App\Services\Pixelforge\Exceptions\PixelforgeException;
 use App\Services\Pixelforge\PixelforgeClient;
 use App\Services\Pricing\PricingProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -158,18 +161,18 @@ test('an outage does not make every request retry Pixelforge', function () {
 });
 
 test('a generation cannot be created when no pricing is known, and nothing is held', function () {
-    \Illuminate\Support\Facades\Queue::fake();
+    Queue::fake();
 
     app()->instance(PixelforgeClient::class, pricingClient(new PixelforgeException('down', 503)));
     Cache::forget(PricingProvider::CACHE_KEY);
 
-    $user = \App\Models\User::factory()->create(['balance_usd' => '100.000000000']);
+    $user = User::factory()->create(['balance_usd' => '100.000000000']);
 
     $this->actingAs($user)->post(route('generations.store'), ['prompt' => 'A calm lake'])
         ->assertSessionHasErrors('general');
 
-    expect(\App\Models\Generation::count())->toBe(0);
-    \Illuminate\Support\Facades\Queue::assertNothingPushed();
+    expect(Generation::count())->toBe(0);
+    Queue::assertNothingPushed();
 });
 
 test('the dashboard and estimate endpoint still work from stored pricing during an outage', function () {
@@ -179,7 +182,7 @@ test('the dashboard and estimate endpoint still work from stored pricing during 
     Cache::forget(PricingProvider::CACHE_KEY);
     app()->forgetInstance(PricingProvider::class);
 
-    $user = \App\Models\User::factory()->create();
+    $user = User::factory()->create();
 
     $this->actingAs($user)->get(route('dashboard'))->assertOk()
         ->assertInertia(fn ($page) => $page->has('initialEstimate.costs'));

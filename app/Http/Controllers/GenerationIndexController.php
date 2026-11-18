@@ -31,7 +31,6 @@ class GenerationIndexController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-
         $hasActive = $user->generations()
             ->whereIn('status', GenerationStatus::pending())
             ->exists();
