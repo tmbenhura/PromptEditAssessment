@@ -16,7 +16,7 @@ defineProps<{
                 <div>
                     <CardTitle class="text-base font-semibold">User Spend & Credit Balances</CardTitle>
                     <CardDescription>
-                        Cumulative spend, provider usage, and profitability grouped by user.
+                        Spend, provider usage, and profitability per user over the selected dates.
                     </CardDescription>
                 </div>
                 <Users class="h-4 w-4 text-neutral-400" />

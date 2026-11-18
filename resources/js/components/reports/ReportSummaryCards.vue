@@ -3,11 +3,10 @@ import { ArrowUpRight, CheckCircle2, DollarSign, TrendingUp } from '@lucide/vue'
 import { computed } from 'vue';
 import StatCard from '@/components/reports/StatCard.vue';
 import { formatUsd } from '@/lib/money';
-import type { DailyReportEntry, ReportSummary } from '@/types';
+import type { ReportSummary } from '@/types';
 
 const props = defineProps<{
     summary: ReportSummary;
-    dailyReport: DailyReportEntry[];
 }>();
 
 const reconciliationStatus = computed(() => {
@@ -15,7 +14,7 @@ const reconciliationStatus = computed(() => {
         return { label: 'Usage unavailable', dotClass: 'bg-neutral-400' };
     }
 
-    return props.dailyReport.every((day) => day.reconciled)
+    return props.summary.all_days_reconciled
         ? { label: 'Reconciled', dotClass: 'bg-emerald-500' }
         : { label: 'Discrepancies found', dotClass: 'bg-rose-500' };
 });

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 
 defineProps<{
     isLoading: boolean;
+    error?: string;
 }>();
 
 defineEmits<{
@@ -27,5 +28,6 @@ const endDate = defineModel<string>('endDate', { required: true });
             <RefreshCw v-if="isLoading" class="h-3.5 w-3.5 animate-spin" />
             <span>Filter</span>
         </Button>
+        <p v-if="error" class="w-full text-xs font-medium text-rose-500">{{ error }}</p>
     </form>
 </template>

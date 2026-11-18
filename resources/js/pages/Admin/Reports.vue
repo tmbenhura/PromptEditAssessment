@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Head, router } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import { BarChart3 } from '@lucide/vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import DailyReconciliationTable from '@/components/reports/DailyReconciliationTable.vue';
 import DateRangeFilter from '@/components/reports/DateRangeFilter.vue';
 import ReportSummaryCards from '@/components/reports/ReportSummaryCards.vue';
@@ -32,6 +32,11 @@ defineOptions({
 const startDate = ref(props.filters.start_date);
 const endDate = ref(props.filters.end_date);
 const isFiltering = ref(false);
+
+const page = usePage();
+const dateRangeError = computed(
+    () => page.props.errors?.end_date ?? page.props.errors?.start_date,
+);
 
 function applyDateFilter() {
     isFiltering.value = true;
@@ -71,11 +76,12 @@ function applyDateFilter() {
                 v-model:start-date="startDate"
                 v-model:end-date="endDate"
                 :is-loading="isFiltering"
+                :error="dateRangeError"
                 @apply="applyDateFilter"
             />
         </div>
 
-        <ReportSummaryCards :summary="summary" :daily-report="dailyReport" />
+        <ReportSummaryCards :summary="summary" />
 
         <DailyReconciliationTable :days="dailyReport" />
 
