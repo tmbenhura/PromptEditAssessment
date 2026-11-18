@@ -36,7 +36,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import AppLayout from '@/layouts/AppLayout.vue';
 
 interface GenerationItem {
     id: string;
@@ -295,7 +294,7 @@ onUnmounted(() => {
                     <span>Buy Credits</span>
                 </Button>
 
-                <Button variant="outline" as-child class="gap-2">
+                <Button v-if="$page.props.auth.user.is_admin" variant="outline" as-child class="gap-2">
                     <a href="/reports">
                         <BarChart3 class="h-4 w-4 text-neutral-500" />
                         <span>Operator Reports</span>
@@ -315,7 +314,7 @@ onUnmounted(() => {
                             Generate Image
                         </CardTitle>
                         <CardDescription>
-                            Submit prompt to Pixelforge. Cost includes a 25% markup on provider rates.
+                            Submit prompt to Pixelforge.
                         </CardDescription>
                     </CardHeader>
 
@@ -336,7 +335,7 @@ onUnmounted(() => {
                                     required
                                     maxlength="4000"
                                     placeholder="A lighthouse on a cliff at dawn, dramatic waves, oil painting..."
-                                    class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    class="w-full rounded-md border border-input dark:bg-neutral-900/50 px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 ></textarea>
                                 <div v-if="form.errors.prompt" class="text-xs text-rose-500 font-medium">
                                     {{ form.errors.prompt }}
@@ -351,38 +350,38 @@ onUnmounted(() => {
                                 <div class="flex flex-wrap gap-1.5">
                                     <button
                                         type="button"
-                                        class="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 transition"
+                                        class="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 transition cursor-pointer"
                                         @click="appendTestKeyword('[succeed]')"
                                     >
-                                        + [succeed]
+                                        [succeed]
                                     </button>
                                     <button
                                         type="button"
-                                        class="rounded bg-rose-50 px-2 py-0.5 text-xs text-rose-700 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/60 transition"
+                                        class="rounded bg-rose-50 px-2 py-0.5 text-xs text-rose-700 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/60 transition cursor-pointer"
                                         @click="appendTestKeyword('[fail]')"
                                     >
-                                        + [fail] (Free)
+                                        [fail]
                                     </button>
                                     <button
                                         type="button"
-                                        class="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/60 transition"
+                                        class="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/60 transition cursor-pointer"
                                         @click="appendTestKeyword('[slow]')"
                                     >
-                                        + [slow] (60-90s)
+                                        [slow]
                                     </button>
                                     <button
                                         type="button"
-                                        class="rounded bg-purple-50 px-2 py-0.5 text-xs text-purple-700 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900/60 transition"
+                                        class="rounded bg-purple-50 px-2 py-0.5 text-xs text-purple-700 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900/60 transition cursor-pointer"
                                         @click="appendTestKeyword('[duplicate]')"
                                     >
-                                        + [duplicate]
+                                        [duplicate]
                                     </button>
                                     <button
                                         type="button"
-                                        class="rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/60 transition"
+                                        class="rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/60 transition cursor-pointer"
                                         @click="appendTestKeyword('[blocked]')"
                                     >
-                                        + [blocked]
+                                        [blocked]
                                     </button>
                                 </div>
                             </div>
@@ -395,7 +394,7 @@ onUnmounted(() => {
                                         v-for="s in sizes"
                                         :key="s.value"
                                         type="button"
-                                        class="flex flex-col items-center justify-center rounded-lg border p-2 text-center transition"
+                                        class="flex flex-col items-center justify-center rounded-lg border p-2 text-center transition cursor-pointer"
                                         :class="[
                                             form.size === s.value
                                                 ? 'border-primary bg-primary/5 text-primary ring-1 ring-primary'
@@ -417,7 +416,7 @@ onUnmounted(() => {
                                         v-for="q in qualities"
                                         :key="q.value"
                                         type="button"
-                                        class="rounded-lg border p-2 text-center text-xs font-medium transition"
+                                        class="rounded-lg border p-2 text-center text-xs font-medium transition cursor-pointer"
                                         :class="[
                                             form.quality === q.value
                                                 ? 'border-primary bg-primary/5 text-primary ring-1 ring-primary'
@@ -470,7 +469,7 @@ onUnmounted(() => {
                                         type="button"
                                         size="sm"
                                         variant="outline"
-                                        class="h-8 px-2 text-xs"
+                                        class="h-8 px-2 text-xs cursor-pointer"
                                         @click="addReferenceImage"
                                     >
                                         <Plus class="h-3.5 w-3.5 mr-1" />
@@ -484,10 +483,10 @@ onUnmounted(() => {
                                 <div class="flex items-center justify-between">
                                     <span class="font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
                                         <Coins class="h-4 w-4 text-amber-500" />
-                                        Estimated Cost (with 25% markup)
+                                        Estimated Cost
                                     </span>
                                     <Badge variant="outline" class="font-mono text-[11px]">
-                                        ~${{ estimate.typicalUserCost.toFixed(5) }}
+                                        ≈ ${{ estimate.typicalUserCost.toFixed(5) }}
                                     </Badge>
                                 </div>
 
@@ -537,15 +536,15 @@ onUnmounted(() => {
                             </div>
                         </CardContent>
 
-                        <CardFooter class="pt-0">
+                        <CardFooter class="pt-4">
                             <Button
                                 type="submit"
-                                class="w-full gap-2 py-5"
+                                class="w-full gap-2 py-5 bg-lime-400 hover:bg-lime-300 cursor-pointer"
                                 :disabled="form.processing || !form.prompt.trim() || !canAfford"
                             >
                                 <Loader2 v-if="form.processing" class="h-4 w-4 animate-spin" />
                                 <Sparkles v-else class="h-4 w-4" />
-                                <span>Generate (~${{ estimate.typicalUserCost.toFixed(4) }})</span>
+                                <span class="uppercase">Generate <span class="opacity-50"> ≈ ${{ estimate.typicalUserCost.toFixed(4) }}</span></span>
                             </Button>
                         </CardFooter>
                     </form>
@@ -575,7 +574,7 @@ onUnmounted(() => {
                         <Button
                             size="sm"
                             variant="ghost"
-                            class="h-8 px-2 text-xs"
+                            class="h-8 px-2 text-xs cursor-pointer"
                             @click="router.reload({ preserveScroll: true })"
                         >
                             <RefreshCw class="h-3.5 w-3.5 mr-1" />
@@ -598,7 +597,7 @@ onUnmounted(() => {
                     <Card
                         v-for="gen in generations.data"
                         :key="gen.id"
-                        class="overflow-hidden transition-all hover:shadow-xs"
+                        class="overflow-hidden transition-all hover:shadow-xs py-0"
                     >
                         <div class="flex flex-col sm:flex-row">
                             <!-- Image Preview Box -->
@@ -608,12 +607,12 @@ onUnmounted(() => {
                                     <img
                                         :src="gen.image_url"
                                         :alt="gen.prompt"
-                                        class="h-full w-full object-cover transition hover:scale-105 cursor-pointer"
+                                        class="h-full w-full object-cover transition ease-in duration-500 hover:scale-105 cursor-pointer"
                                         @click="previewImage = gen.image_url"
                                     />
                                     <button
                                         type="button"
-                                        class="absolute bottom-2 right-2 rounded-full bg-black/60 p-1.5 text-white backdrop-blur-xs transition hover:bg-black/80"
+                                        class="absolute bottom-2 right-2 rounded-full bg-black/60 p-1.5 text-white backdrop-blur-xs transition hover:bg-black/80 cursor-pointer"
                                         title="View Full Resolution"
                                         @click="previewImage = gen.image_url"
                                     >
@@ -634,10 +633,10 @@ onUnmounted(() => {
 
                                 <!-- Failed -->
                                 <template v-else-if="gen.status === 'failed'">
-                                    <div class="flex flex-col items-center gap-1.5 p-4 text-center text-rose-500">
-                                        <AlertCircle class="h-7 w-7 text-rose-500" />
+                                    <div class="flex flex-col items-center gap-1.5 p-4 text-center text-rose-800">
+                                        <AlertCircle class="h-7 w-7 text-rose-800" />
                                         <span class="text-xs font-semibold">Generation Failed</span>
-                                        <span class="text-[10px] text-neutral-400">Charged $0.00</span>
+                                        <span class="text-[10px] text-neutral-400">No Charge</span>
                                     </div>
                                 </template>
                             </div>
@@ -694,11 +693,11 @@ onUnmounted(() => {
                                     </p>
                                     <button
                                         type="button"
-                                        class="mt-1 flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+                                        class="mt-1 flex items-center gap-1 text-[10px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
                                         @click="copyPrompt(gen.id, gen.prompt)"
                                     >
                                         <Copy class="h-3 w-3" />
-                                        <span>{{ copiedPromptId === gen.id ? 'Copied!' : 'Copy prompt' }}</span>
+                                        <span>{{ copiedPromptId === gen.id ? 'Copied!' : 'Copy Prompt' }}</span>
                                     </button>
                                 </div>
 
@@ -727,14 +726,11 @@ onUnmounted(() => {
                                                     gen.status === 'succeeded'
                                                         ? 'text-neutral-900 dark:text-neutral-100'
                                                         : gen.status === 'failed'
-                                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                                        ? 'text-neutral-900 dark:text-neutral-100'
                                                         : 'text-neutral-400',
                                                 ]"
                                             >
-                                                ${{ Number(gen.actual_user_cost).toFixed(6) }}
-                                                <span v-if="gen.status === 'failed'" class="text-[10px] font-normal text-emerald-600">
-                                                    (Free)
-                                                </span>
+                                                ${{ gen.status === 'failed' ? '0.0' : Number(gen.actual_user_cost).toFixed(6) }}
                                             </span>
                                         </div>
                                     </div>

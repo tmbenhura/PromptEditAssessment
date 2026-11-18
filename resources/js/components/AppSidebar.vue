@@ -16,8 +16,11 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
+import { computed } from 'vue';
+import { usePage } from '@inertiajs/vue3'
 
-const mainNavItems: NavItem[] = [
+const page = usePage()
+const baseMainNavItems: NavItem[] = [
     {
         title: 'Studio',
         href: dashboard(),
@@ -27,18 +30,20 @@ const mainNavItems: NavItem[] = [
         title: 'Financial Reports',
         href: '/reports',
         icon: BarChart3,
+        adminOnly: true
     },
 ];
 
+const mainNavItems = computed(() => baseMainNavItems.filter(menuItem => page.props.auth.user.is_admin || !menuItem.adminOnly))
 const footerNavItems: NavItem[] = [
     {
         title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
+        href: 'https://github.com/tmbenhura/PromptEditAssessment',
         icon: FolderGit2,
     },
     {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
+        title: 'Linked-In Profile',
+        href: 'https://zw.linkedin.com/in/taurai-benhura-3329452a',
         icon: BookOpen,
     },
 ];

@@ -21,7 +21,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('/credits/buy', PurchaseCreditController::class)->name('credits.buy');
 
-    Route::get('/reports', AdminReportController::class)->name('admin.reports');
+    Route::get('/reports', AdminReportController::class)->middleware('admin')->name('admin.reports');
 });
 
 require __DIR__.'/settings.php';

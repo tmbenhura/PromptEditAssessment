@@ -53,7 +53,7 @@ const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
 const activeItemStyles =
     'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100';
 
-const mainNavItems: NavItem[] = [
+const baseMainNavItems: NavItem[] = [
     {
         title: 'Studio',
         href: dashboard(),
@@ -63,18 +63,21 @@ const mainNavItems: NavItem[] = [
         title: 'Financial Reports',
         href: '/reports',
         icon: BarChart3,
+        adminOnly: true
     },
 ];
+
+const mainNavItems = computed(() => baseMainNavItems.filter(menuItem => page.props.auth.user.is_admin || !menuItem.adminOnly))
 
 const rightNavItems: NavItem[] = [
     {
         title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
+        href: 'https://github.com/tmbenhura/PromptEditAssessment',
         icon: Folder,
     },
     {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
+        title: 'Linked-In Profile',
+        href: 'https://zw.linkedin.com/in/taurai-benhura-3329452a',
         icon: BookOpen,
     },
 ];

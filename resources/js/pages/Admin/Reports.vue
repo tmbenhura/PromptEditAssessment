@@ -16,7 +16,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import AppLayout from '@/layouts/AppLayout.vue';
 
 interface DailyReportEntry {
     date: string;
@@ -91,7 +90,7 @@ function applyFilter() {
     );
 }
 
-function formatMoney(amount: string | number, decimals: number = 6): string {
+function formatMoney(amount: string | number, decimals: number = 9): string {
     const num = Number(amount);
     return isNaN(num) ? '$0.00' : `$${num.toFixed(decimals)}`;
 }
@@ -251,10 +250,10 @@ function formatMoney(amount: string | number, decimals: number = 6): string {
                                 </span>
                             </td>
                             <td class="p-3 font-mono text-xs">
-                                {{ formatMoney(row.pixelforge_cost_usd, 6) }}
+                                {{ formatMoney(row.pixelforge_cost_usd, 9) }}
                             </td>
                             <td class="p-3 font-mono text-xs">
-                                {{ formatMoney(row.provider_cost_usd, 6) }}
+                                {{ formatMoney(row.provider_cost_usd, 9) }}
                             </td>
                             <td class="p-3">
                                 <span
@@ -273,10 +272,10 @@ function formatMoney(amount: string | number, decimals: number = 6): string {
                                 </span>
                             </td>
                             <td class="p-3 font-mono text-xs font-medium text-neutral-900 dark:text-neutral-100">
-                                {{ formatMoney(row.user_spend_usd, 6) }}
+                                {{ formatMoney(row.user_spend_usd, 9) }}
                             </td>
                             <td class="p-3 font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                                +{{ formatMoney(row.profit_usd, 6) }}
+                                +{{ formatMoney(row.profit_usd, 9) }}
                             </td>
                         </tr>
                     </tbody>
@@ -326,13 +325,13 @@ function formatMoney(amount: string | number, decimals: number = 6): string {
                                 {{ u.generations_count }}
                             </td>
                             <td class="p-3 font-mono text-xs text-neutral-500">
-                                {{ formatMoney(u.provider_cost_usd, 6) }}
+                                {{ formatMoney(u.provider_cost_usd, 9) }}
                             </td>
                             <td class="p-3 font-mono text-xs font-semibold text-neutral-900 dark:text-neutral-100">
-                                {{ formatMoney(u.user_spend_usd, 6) }}
+                                {{ formatMoney(u.user_spend_usd, 9) }}
                             </td>
                             <td class="p-3 font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                +{{ formatMoney(u.profit_usd, 6) }}
+                                +{{ formatMoney(u.profit_usd, 9) }}
                             </td>
                         </tr>
                     </tbody>

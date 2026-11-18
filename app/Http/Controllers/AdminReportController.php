@@ -35,8 +35,8 @@ class AdminReportController extends Controller
         // Group local generations by UTC date of completion
         /** @var array<string, array{date: string, generations: int, succeeded: int, failed: int, provider_cost_usd: numeric-string, user_spend_usd: numeric-string, profit_usd: numeric-string}> $localDaily */
         $localDaily = [];
-        foreach ($generations as $gen) {
-            $date = Carbon::parse($gen->pixelforge_completed_at)->setTimezone('UTC')->format('Y-m-d');
+        foreach ($generations as $generation) {
+            $date = Carbon::parse($generation->pixelforge_completed_at)->setTimezone('UTC')->format('Y-m-d');
             if (! isset($localDaily[$date])) {
                 $localDaily[$date] = [
                     'date' => $date,
@@ -50,14 +50,14 @@ class AdminReportController extends Controller
             }
 
             $localDaily[$date]['generations']++;
-            if ($gen->status === GenerationStatus::Succeeded) {
+            if ($generation->status === GenerationStatus::Succeeded) {
                 $localDaily[$date]['succeeded']++;
             } else {
                 $localDaily[$date]['failed']++;
             }
 
-            $providerCost = $gen->actual_provider_cost;
-            $userCost = $gen->actual_user_cost;
+            $providerCost = $generation->actual_provider_cost;
+            $userCost = $generation->actual_user_cost;
 
             $localDaily[$date]['provider_cost_usd'] = bcadd(
                 $localDaily[$date]['provider_cost_usd'],
@@ -147,9 +147,9 @@ class AdminReportController extends Controller
                 /** @var numeric-string $userSpend */
                 $userSpend = '0.000000000';
 
-                foreach ($userGenerations as $gen) {
-                    $providerCost = bcadd($providerCost, $gen->actual_provider_cost, 9);
-                    $userSpend = bcadd($userSpend, $gen->actual_user_cost, 9);
+                foreach ($userGenerations as $generation) {
+                    $providerCost = bcadd($providerCost, $generation->actual_provider_cost, 9);
+                    $userSpend = bcadd($userSpend, $generation->actual_user_cost, 9);
                 }
 
                 $profit = bcsub($userSpend, $providerCost, 9);
