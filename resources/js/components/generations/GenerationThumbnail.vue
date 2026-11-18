@@ -83,9 +83,9 @@ const imageExpired = computed(
             </template>
             <template v-else>
                 <span class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
-                    {{ generation.status === 'queued' ? 'In Pixelforge Queue' : 'Rendering Image...' }}
+                    {{ generation.status === 'queued' ? 'In Queue' : 'Rendering Image...' }}
                 </span>
-                <span class="text-[10px] text-neutral-400">Updates live</span>
+                <span class="text-[10px] text-neutral-400">Waiting</span>
             </template>
         </div>
 
