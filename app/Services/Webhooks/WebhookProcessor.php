@@ -10,6 +10,8 @@ use App\Services\Pricing\CostCalculator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Throwable;
 
 class WebhookProcessor
 {
@@ -56,6 +58,9 @@ class WebhookProcessor
     /**
      * Process an incoming webhook payload idempotently.
      *
+     * Every authenticated delivery is recorded in webhook_events (one row per event
+     * id; redeliveries bump delivery_count), whatever happens to it afterwards.
+     *
      * @param  array<string, mixed>  $payload
      * @return bool True if processed, false if deduplicated or skipped
      */
@@ -65,59 +70,107 @@ class WebhookProcessor
         $eventType = (string) ($payload['type'] ?? '');
 
         if ($eventId === '') {
+            // Nothing to dedupe on, but still worth keeping a record of.
+            $this->recordEvent('missing-'.Str::uuid(), $eventType, $payload, WebhookEvent::OUTCOME_IGNORED);
+
             return false;
         }
 
-        if ($eventType === 'ping') {
-            return true;
+        try {
+            return DB::transaction(function () use ($eventId, $eventType, $payload): bool {
+                $existing = WebhookEvent::query()->where('event_id', $eventId)->lockForUpdate()->first();
+
+                if ($existing !== null && $existing->outcome !== WebhookEvent::OUTCOME_FAILED) {
+                    // Redelivery: remember that it happened, but never apply it twice.
+                    $existing->forceFill([
+                        'delivery_count' => $existing->delivery_count + 1,
+                        'last_received_at' => now(),
+                    ])->save();
+
+                    return false;
+                }
+
+                // A first delivery, or the retry of one that failed earlier.
+                $event = $existing ?? new WebhookEvent(['event_id' => $eventId]);
+                $event->fill([
+                    'event_type' => $eventType,
+                    'payload' => $payload,
+                    'outcome' => WebhookEvent::OUTCOME_PROCESSED,
+                    'error' => null,
+                    'processed_at' => now(),
+                ])->forceFill([
+                    'delivery_count' => ($existing?->delivery_count ?? 0) + 1,
+                    'last_received_at' => now(),
+                ])->save();
+
+                if ($eventType === 'ping') {
+                    $event->update(['outcome' => WebhookEvent::OUTCOME_IGNORED]);
+
+                    return true;
+                }
+
+                $generationData = $payload['data']['object'] ?? null;
+                if (! is_array($generationData)) {
+                    $event->update(['outcome' => WebhookEvent::OUTCOME_IGNORED]);
+
+                    return true;
+                }
+
+                $pixelforgeId = (string) ($generationData['id'] ?? '');
+                $appGenerationId = $generationData['metadata']['app_generation_id'] ?? null;
+
+                // Find generation by Pixelforge ID or metadata app_generation_id
+                $query = Generation::query();
+                if ($pixelforgeId !== '') {
+                    $query->where('pixelforge_id', $pixelforgeId);
+                }
+                if ($appGenerationId !== null) {
+                    $query->orWhere('id', (string) $appGenerationId);
+                }
+
+                $generation = $query->lockForUpdate()->first();
+
+                if (! $generation) {
+                    // Generation not found in DB yet (e.g. webhook arrived before POST returned)
+                    Log::warning("Pixelforge webhook received for unknown generation: {$pixelforgeId}");
+                    $event->update(['outcome' => WebhookEvent::OUTCOME_IGNORED]);
+
+                    return true;
+                }
+
+                $event->update(['generation_id' => $generation->id]);
+
+                $this->applyGenerationUpdate($generation, $generationData);
+
+                return true;
+            });
+        } catch (Throwable $e) {
+            // The transaction rolled back, so keep a record of the failure on its own.
+            // Pixelforge will redeliver, and a later success updates this same row.
+            $this->recordEvent($eventId, $eventType, $payload, WebhookEvent::OUTCOME_FAILED, $e->getMessage());
+
+            throw $e;
         }
+    }
 
-        // Deduplicate using WebhookEvent table inside transaction
-        return DB::transaction(function () use ($eventId, $eventType, $payload) {
-            $existing = WebhookEvent::query()->where('event_id', $eventId)->lockForUpdate()->first();
-            if ($existing !== null) {
-                // Event already received and processed
-                return false;
-            }
+    /**
+     * Log a delivery that was not (or could not be) processed.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function recordEvent(string $eventId, string $eventType, array $payload, string $outcome, ?string $error = null): void
+    {
+        $event = WebhookEvent::query()->firstOrNew(['event_id' => $eventId]);
 
-            WebhookEvent::create([
-                'event_id' => $eventId,
-                'event_type' => $eventType,
-                'payload' => $payload,
-                'processed_at' => now(),
-            ]);
-
-            $generationData = $payload['data']['object'] ?? null;
-            if (! is_array($generationData)) {
-                return true;
-            }
-
-            $pixelforgeId = (string) ($generationData['id'] ?? '');
-            $appGenerationId = $generationData['metadata']['app_generation_id'] ?? null;
-
-            // Find generation by Pixelforge ID or metadata app_generation_id
-            $query = Generation::query();
-            if ($pixelforgeId !== '') {
-                $query->where('pixelforge_id', $pixelforgeId);
-            }
-            if ($appGenerationId !== null) {
-                $query->orWhere('id', (string) $appGenerationId);
-            }
-
-            $generation = $query->lockForUpdate()->first();
-
-            if (! $generation) {
-                // Generation not found in DB yet (e.g. webhook arrived before POST returned)
-                // We will create the placeholder or store it
-                Log::warning("Pixelforge webhook received for unknown generation: {$pixelforgeId}");
-
-                return true;
-            }
-
-            $this->applyGenerationUpdate($generation, $generationData);
-
-            return true;
-        });
+        $event->fill([
+            'event_type' => $eventType,
+            'payload' => $payload,
+            'outcome' => $outcome,
+            'error' => $error,
+        ])->forceFill([
+            'delivery_count' => ($event->exists ? $event->delivery_count : 0) + 1,
+            'last_received_at' => now(),
+        ])->save();
     }
 
     /**

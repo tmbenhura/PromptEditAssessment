@@ -73,6 +73,21 @@ return [
             'queue' => env('PIXELFORGE_SUBMISSION_QUEUE'),
             'connection' => env('PIXELFORGE_SUBMISSION_CONNECTION'),
         ],
+
+        /*
+        | Webhook event log (see App\Console\Commands\PruneWebhookEvents).
+        */
+        'webhook_events' => [
+            // Events last received more than this many days ago are deleted by
+            // `php artisan webhook-events:prune`. Zero or less disables pruning.
+            'retention_days' => (int) env('PIXELFORGE_WEBHOOK_EVENTS_RETENTION_DAYS', 30),
+
+            // Rows deleted per query, so a large backlog never holds one long lock.
+            'prune_chunk' => (int) env('PIXELFORGE_WEBHOOK_EVENTS_PRUNE_CHUNK', 1000),
+
+            // Time of day (server time) the prune command runs each day.
+            'prune_at' => env('PIXELFORGE_WEBHOOK_EVENTS_PRUNE_AT', '03:00'),
+        ],
     ],
 
 ];

@@ -11,6 +11,11 @@ use Illuminate\Support\Carbon;
  * @property string $event_id
  * @property string $event_type
  * @property array<string, mixed> $payload
+ * @property string $outcome
+ * @property string|null $generation_id
+ * @property int $delivery_count
+ * @property string|null $error
+ * @property Carbon|null $last_received_at
  * @property Carbon|null $processed_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -19,10 +24,31 @@ use Illuminate\Support\Carbon;
     'event_id',
     'event_type',
     'payload',
+    'outcome',
+    'generation_id',
+    'error',
     'processed_at',
 ])]
 class WebhookEvent extends Model
 {
+    public const OUTCOME_PROCESSED = 'processed';
+
+    /** Received but nothing to do: ping, no event id, or unknown generation. */
+    public const OUTCOME_IGNORED = 'ignored';
+
+    public const OUTCOME_FAILED = 'failed';
+
+    /**
+     * Events last received before the cutoff (the retention period, in days).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<self>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<self>
+     */
+    public function scopeOlderThanDays($query, int $days)
+    {
+        return $query->where('last_received_at', '<', now()->subDays($days));
+    }
+
     /**
      * @return array<string, string>
      */
@@ -30,6 +56,8 @@ class WebhookEvent extends Model
     {
         return [
             'payload' => 'array',
+            'delivery_count' => 'integer',
+            'last_received_at' => 'datetime',
             'processed_at' => 'datetime',
         ];
     }
