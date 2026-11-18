@@ -44,6 +44,8 @@ class ReconcileGenerations extends Command
             ->where('status', GenerationStatus::Queued)
             ->whereNull('pixelforge_id')
             ->where('created_at', '<', now()->subSeconds($resubmitAfter))
+            // Waiting for the daily quota to reset: a job is already scheduled for then.
+            ->where(fn ($query) => $query->whereNull('submit_after')->orWhere('submit_after', '<=', now()))
             ->oldest()
             ->limit($maxPerRun)
             ->get();

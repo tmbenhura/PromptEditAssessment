@@ -12,6 +12,7 @@ use App\Services\Pixelforge\PixelforgeClient;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Throwable;
 
@@ -41,8 +42,16 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
      */
     public int $uniqueFor;
 
-    public function __construct(public readonly string $generationId)
-    {
+    /**
+     * @param  int  $wave  Which deferral this job is. A generation held back by the daily
+     *                     quota is submitted by a brand new job (wave + 1) at the next UTC
+     *                     midnight, so it starts with a full attempt budget and its own
+     *                     uniqueness lock.
+     */
+    public function __construct(
+        public readonly string $generationId,
+        public readonly int $wave = 0,
+    ) {
         $this->tries = max(1, (int) config('services.pixelforge.submission.max_attempts', 6));
         $this->uniqueFor = (int) config('services.pixelforge.submission.unique_for', 900);
 
@@ -69,7 +78,7 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
 
     public function uniqueId(): string
     {
-        return $this->generationId;
+        return $this->generationId.':'.$this->wave;
     }
 
     /**
@@ -104,8 +113,10 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
 
             return;
         } catch (PixelforgeRateLimitException $e) {
+            // The daily quota is used up and Pixelforge gives no Retry-After. Retrying
+            // sooner is pointless, so wait for the quota to reset instead of failing.
             if ($e->errorCode === 'daily_limit_exceeded') {
-                $this->markFailed($generation, $e->errorCode, $e->getMessage());
+                $this->deferUntilQuotaResets($generation);
 
                 return;
             }
@@ -128,6 +139,7 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
         // A webhook may already have advanced this generation, so only touch the
         // submission fields and never the status.
         $generation = $generation->fresh() ?? $generation;
+        $generation->submit_after = null;
         $generation->pixelforge_id ??= (string) $response['id'];
         $generation->pixelforge_created_at ??= ! empty($response['created_at'])
             ? Carbon::parse((string) $response['created_at'])
@@ -138,6 +150,39 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
         }
 
         $generation->save();
+    }
+
+    /**
+     * The start of the next UTC day (when the daily quota resets), plus the
+     * configured safety margin.
+     */
+    public static function nextQuotaReset(?CarbonImmutable $now = null): CarbonImmutable
+    {
+        return ($now ?? CarbonImmutable::now('UTC'))
+            ->setTimezone('UTC')
+            ->addDay()
+            ->startOfDay()
+            ->addSeconds(max(0, (int) config('services.pixelforge.submission.daily_limit_buffer', 30)));
+    }
+
+    /**
+     * Hold the generation until the daily quota resets. It stays queued, its credits
+     * stay reserved, and a fresh job picks it up at the next UTC midnight.
+     */
+    protected function deferUntilQuotaResets(Generation $generation): void
+    {
+        $generation = $generation->fresh() ?? $generation;
+
+        // Accepted or finished in the meantime: nothing left to submit.
+        if ($generation->isFinal() || $generation->pixelforge_id !== null) {
+            return;
+        }
+
+        $resumeAt = static::nextQuotaReset();
+
+        $generation->update(['submit_after' => $resumeAt]);
+
+        static::dispatch($this->generationId, $this->wave + 1)->delay($resumeAt);
     }
 
     /**

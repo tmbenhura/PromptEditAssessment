@@ -114,3 +114,93 @@ test('failed hook marks an unsubmitted generation as failed at no cost', functio
         ->error_code->toBe('submission_failed')
         ->actual_user_cost->toBe('0.000000000');
 });
+
+function dailyLimitClient(): PixelforgeClient
+{
+    return new class extends PixelforgeClient
+    {
+        public function createGeneration(array $payload, ?string $idempotencyKey = null): array
+        {
+            // Pixelforge sends no Retry-After for this one.
+            throw new \App\Services\Pixelforge\Exceptions\PixelforgeRateLimitException(
+                'The daily generation quota is used up.', 429, 5, 'daily_limit_exceeded', 'rate_limit_error',
+            );
+        }
+    };
+}
+
+test('the next quota reset is the start of the next UTC day plus the margin', function () {
+    config(['services.pixelforge.submission.daily_limit_buffer' => 30]);
+
+    $late = \Carbon\CarbonImmutable::parse('2026-11-18 23:59:50', 'UTC');
+    expect(SubmitGeneration::nextQuotaReset($late)->toDateTimeString())->toBe('2026-11-19 00:00:30');
+
+    // Always the *next* day, even exactly at midnight, and whatever the input timezone.
+    $midnight = \Carbon\CarbonImmutable::parse('2026-11-19 00:00:00', 'UTC');
+    expect(SubmitGeneration::nextQuotaReset($midnight)->toDateTimeString())->toBe('2026-11-20 00:00:30');
+
+    $harare = \Carbon\CarbonImmutable::parse('2026-11-19 01:30:00', 'Africa/Harare'); // 23:30 UTC on the 18th
+    expect(SubmitGeneration::nextQuotaReset($harare)->toDateTimeString())->toBe('2026-11-19 00:00:30');
+});
+
+test('hitting the daily limit holds the generation until the next UTC day instead of failing it', function () {
+    \Illuminate\Support\Facades\Queue::fake();
+    $this->travelTo(\Carbon\CarbonImmutable::parse('2026-11-18 14:00:00', 'UTC'));
+
+    $generation = Generation::factory()->create([
+        'status' => GenerationStatus::Queued,
+        'pixelforge_id' => null,
+    ]);
+
+    (new SubmitGeneration($generation->id))->handle(dailyLimitClient());
+
+    $generation->refresh();
+
+    expect($generation->status)->toBe(GenerationStatus::Queued)
+        ->and($generation->error_code)->toBeNull()
+        ->and($generation->submit_after->utc()->toDateTimeString())->toBe('2026-11-19 00:00:30');
+
+    // A fresh job (own attempt budget, own uniqueness key) is scheduled for then.
+    \Illuminate\Support\Facades\Queue::assertPushed(SubmitGeneration::class, fn ($job) => $job->generationId === $generation->id
+        && $job->wave === 1
+        && $job->uniqueId() === $generation->id.':1'
+        && $job->delay->utc()->toDateTimeString() === '2026-11-19 00:00:30');
+});
+
+test('a generation held for the daily limit keeps its credits reserved', function () {
+    \Illuminate\Support\Facades\Queue::fake();
+
+    $user = User::factory()->create(['balance_usd' => '10.000000000']);
+    $generation = Generation::factory()->create([
+        'user_id' => $user->id,
+        'status' => GenerationStatus::Queued,
+        'pixelforge_id' => null,
+        'reserved_user_cost' => '1.000000000',
+    ]);
+
+    (new SubmitGeneration($generation->id))->handle(dailyLimitClient());
+
+    expect($user->availableBalance())->toBe('9.000000000');
+});
+
+test('a held generation is not resubmitted early by the reconcile command', function () {
+    \Illuminate\Support\Facades\Queue::fake();
+
+    $generation = Generation::factory()->create([
+        'status' => GenerationStatus::Queued,
+        'pixelforge_id' => null,
+        'submit_after' => now()->addHours(6),
+    ]);
+    $generation->forceFill(['created_at' => now()->subHours(8)])->saveQuietly();
+
+    $this->artisan('generations:reconcile')->assertSuccessful();
+
+    \Illuminate\Support\Facades\Queue::assertNothingPushed();
+
+    // Once the wait is over it is fair game again.
+    $generation->forceFill(['submit_after' => now()->subMinute()])->saveQuietly();
+
+    $this->artisan('generations:reconcile')->assertSuccessful();
+
+    \Illuminate\Support\Facades\Queue::assertPushed(SubmitGeneration::class, 1);
+});

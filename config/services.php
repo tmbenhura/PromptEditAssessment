@@ -69,6 +69,11 @@ return [
             'concurrency_lock_ttl' => (int) env('PIXELFORGE_SUBMISSION_LOCK_TTL', 60),
 
             // How long a generation's uniqueness lock lasts, covering all retries.
+            // Pixelforge allows a fixed number of generations per UTC day and sends no
+            // Retry-After when it is used up, so we wait for the next UTC midnight plus this
+            // many seconds of margin for clock differences.
+            'daily_limit_buffer' => (int) env('PIXELFORGE_SUBMISSION_DAILY_LIMIT_BUFFER', 30),
+
             'unique_for' => (int) env('PIXELFORGE_SUBMISSION_UNIQUE_FOR', 900),
 
             // Queue (and connection) submission jobs are dispatched to; null = defaults.

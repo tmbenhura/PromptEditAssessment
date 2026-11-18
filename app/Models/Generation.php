@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property GenerationQuality $quality
  * @property array<int, string>|null $reference_images
  * @property GenerationStatus $status
+ * @property CarbonInterface|null $submit_after
  * @property string|null $image_url
  * @property CarbonInterface|null $image_url_expires_at
  * @property array{input_text_tokens?: int, input_image_tokens?: int, output_tokens?: int, reasoning_tokens?: int, total_tokens?: int}|null $usage
@@ -52,6 +53,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'quality',
     'reference_images',
     'status',
+    'submit_after',
     'image_url',
     'image_url_expires_at',
     'usage',
@@ -84,6 +86,7 @@ class Generation extends Model
             'reference_images' => 'array',
             'usage' => 'array',
             'rates' => 'array',
+            'submit_after' => 'datetime',
             'image_url_expires_at' => 'datetime',
             'pixelforge_created_at' => 'datetime',
             'pixelforge_started_at' => 'datetime',

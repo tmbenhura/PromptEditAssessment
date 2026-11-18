@@ -23,6 +23,8 @@ export interface Generation {
     quality: ImageQuality;
     reference_images: string[] | null;
     status: GenerationStatus;
+    /** Set while the generation waits for Pixelforge's daily quota to reset (UTC midnight). */
+    submit_after: string | null;
     image_url: string | null;
     image_url_expires_at: string | null;
     usage: TokenUsage | null;

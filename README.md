@@ -29,6 +29,13 @@ second image. `429` and `503` responses are retried through the queue, honouring
 `Retry-After` as a floor over a configurable backoff, up to a configurable attempt cap.
 At most `PIXELFORGE_SUBMISSION_MAX_CONCURRENT` (3) submissions run at once.
 
+The daily quota (500 generations per UTC day) is different: Pixelforge sends no
+`Retry-After` for `daily_limit_exceeded`, and retrying sooner is pointless. The generation
+stays queued with its credits reserved, `submit_after` is set to the next UTC midnight
+(plus `PIXELFORGE_SUBMISSION_DAILY_LIMIT_BUFFER` seconds), and a fresh job is scheduled for
+then with a full attempt budget. The dashboard shows when it will start, and the
+reconcile command leaves it alone until that time has passed.
+
 **Pricing and money.** All amounts are exact decimal strings (`decimal(18,9)`) handled with
 bcmath, never floats. Actual cost is computed from the `usage` and the `rates` Pixelforge
 fixed for that generation: `tokens × rate ÷ 1,000,000` per token type, summed exactly,

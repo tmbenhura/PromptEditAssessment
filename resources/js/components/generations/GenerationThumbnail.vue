@@ -11,6 +11,24 @@ defineEmits<{
     preview: [imageUrl: string];
 }>();
 
+// Waiting for the daily generation quota (resets at UTC midnight).
+const waitingForQuota = computed(
+    () =>
+        props.generation.status === 'queued' &&
+        props.generation.submit_after !== null &&
+        new Date(props.generation.submit_after) > new Date(),
+);
+const quotaResetTime = computed(() =>
+    props.generation.submit_after
+        ? new Date(props.generation.submit_after).toLocaleString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+              day: 'numeric',
+              month: 'short',
+          })
+        : '',
+);
+
 // Pixelforge's signed URLs stop working 24 hours after completion.
 const imageUnavailable = ref(false);
 const imageExpired = computed(
@@ -55,10 +73,20 @@ const imageExpired = computed(
             class="flex flex-col items-center gap-2 p-4 text-center"
         >
             <Loader2 class="h-7 w-7 animate-spin text-primary" />
-            <span class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
-                {{ generation.status === 'queued' ? 'In Pixelforge Queue' : 'Rendering Image...' }}
-            </span>
-            <span class="text-[10px] text-neutral-400">Updates live</span>
+            <template v-if="waitingForQuota">
+                <span class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                    Daily limit reached
+                </span>
+                <span class="text-[10px] text-neutral-400">
+                    Starts automatically at {{ quotaResetTime }} (UTC day resets)
+                </span>
+            </template>
+            <template v-else>
+                <span class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                    {{ generation.status === 'queued' ? 'In Pixelforge Queue' : 'Rendering Image...' }}
+                </span>
+                <span class="text-[10px] text-neutral-400">Updates live</span>
+            </template>
         </div>
 
         <div
