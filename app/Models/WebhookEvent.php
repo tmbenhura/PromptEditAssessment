@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
  * @property string $outcome
  * @property string|null $generation_id
  * @property int $delivery_count
+ * @property int|null $delivery_attempt Pixelforge's own count of delivery attempts (latest seen)
  * @property string|null $error
  * @property Carbon|null $last_received_at
  * @property Carbon|null $processed_at
@@ -31,12 +32,36 @@ use Illuminate\Support\Carbon;
 ])]
 class WebhookEvent extends Model
 {
+    /** Logged and acknowledged, not applied yet. */
+    public const OUTCOME_RECEIVED = 'received';
+
     public const OUTCOME_PROCESSED = 'processed';
 
     /** Received but nothing to do: ping, no event id, or unknown generation. */
     public const OUTCOME_IGNORED = 'ignored';
 
     public const OUTCOME_FAILED = 'failed';
+
+    /**
+     * Not applied yet: still waiting (received) or it threw last time (failed).
+     */
+    public function isUnfinished(): bool
+    {
+        return in_array($this->outcome, [self::OUTCOME_RECEIVED, self::OUTCOME_FAILED], true);
+    }
+
+    /**
+     * Events logged but never applied, e.g. the deferred work failed or the process died.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<self>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<self>
+     */
+    public function scopeUnfinishedBefore($query, \DateTimeInterface $cutoff)
+    {
+        return $query
+            ->whereIn('outcome', [self::OUTCOME_RECEIVED, self::OUTCOME_FAILED])
+            ->where('last_received_at', '<', $cutoff);
+    }
 
     /**
      * Events last received before the cutoff (the retention period, in days).

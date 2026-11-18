@@ -9,6 +9,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+// The controller applies events in defer(), after the response. Run it inline here.
+beforeEach(fn () => $this->withoutDefer());
+
 function signWebhookPayload(string $rawPayload, string $secret, ?int $timestamp = null): string
 {
     $t = $timestamp ?? time();

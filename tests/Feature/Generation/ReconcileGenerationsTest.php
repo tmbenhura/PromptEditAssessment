@@ -28,7 +28,7 @@ test('only quiet in-flight generations are picked up for polling', function () {
         ->forceFill(['updated_at' => now()->subHour()])->saveQuietly();
 
     $this->artisan('generations:reconcile --dry-run')
-        ->expectsOutputToContain('1 generation(s) would be polled, 0 resubmitted.')
+        ->expectsOutputToContain('1 generation(s) would be polled, 0 resubmitted, 0 webhook event(s) replayed.')
         ->assertSuccessful();
 });
 

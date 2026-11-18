@@ -52,16 +52,21 @@ transaction. Failures release the hold and cost nothing.
 
 **Webhooks.** `POST /webhooks/pixelforge` verifies the `Pixelforge-Signature` HMAC in
 constant time against the raw body and rejects timestamps more than 5 minutes old. It
-sits outside the `web` middleware group (no session or CSRF). Every authenticated event
-is logged to `webhook_events` (one row per event id; redeliveries bump a counter), and
+sits outside the `web` middleware group (no session or CSRF). It does the minimum before
+replying: verify, log the event, return `204`. The event is then applied with `defer()`,
+after the response, so Pixelforge's 10-second window is never at risk. Every authenticated
+event is logged to `webhook_events` (one row per event id; redeliveries bump a counter and
+record `Pixelforge-Delivery-Attempt`), and
 `webhook-events:prune` deletes old ones past `PIXELFORGE_WEBHOOK_EVENTS_RETENTION_DAYS`.
 A generation never moves back from `succeeded` or `failed`, so out-of-order events are
 harmless, and an event that arrives before the create call returns is matched through the
 `app_generation_id` metadata. A charge is applied at most once: checked under a lock, and
 backed by a unique `(generation_id, type)` index on `transactions`.
 
-**Missed webhooks.** Delivery isn't guaranteed, so `generations:reconcile` runs every
-minute: it polls in-flight generations that have been quiet for a while, and resubmits
+**Missed webhooks.** Delivery isn't guaranteed, and because the reply is sent before the
+event is applied, Pixelforge won't retry one whose deferred work fails. That event stays
+on record as `received`/`failed` with its payload, and `generations:reconcile` (every
+minute) replays it. It also polls in-flight generations that have been quiet for a while, and resubmits
 ones whose submission job was lost. Without it a missed webhook would hold a user's
 credits indefinitely.
 
