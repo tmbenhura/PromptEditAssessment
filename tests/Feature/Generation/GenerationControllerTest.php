@@ -25,7 +25,8 @@ test('dashboard page renders for authenticated user with balance and rates', fun
         ->where('balance', '25.000000000')
         ->where('availableBalance', '25.000000000')
         ->where('heldBalance', '0.000000000')
-        ->has('rates')
+        ->has('initialEstimate.costs')
+        ->missing('rates')
         ->has('sizes')
         ->has('qualities')
     );
@@ -42,18 +43,30 @@ test('estimate endpoint calculates accurate token breakdown and costs', function
 
     $response->assertOk();
     $response->assertJsonStructure([
-        'tokens' => [
-            'estimated_text_tokens',
-            'min_text_tokens',
-            'max_text_tokens',
-            'image_tokens',
-            'output_tokens',
-            'min_reasoning_tokens',
-            'max_reasoning_tokens',
-        ],
-        'provider' => ['min_cost', 'max_cost', 'estimated_cost'],
-        'user' => ['min_cost', 'max_cost', 'estimated_cost'],
+        'tokens' => ['text', 'image', 'output', 'reasoning_min', 'reasoning_max'],
+        'costs' => ['text', 'image', 'output', 'reasoning_min', 'reasoning_max', 'min', 'typical', 'max'],
     ]);
+
+    // Only what the user will be charged: no provider cost, rates or markup.
+    expect(array_keys($response->json()))->toBe(['tokens', 'costs'])
+        ->and(json_encode($response->json()))->not->toContain('provider')->not->toContain('rate');
+});
+
+test('generation data sent to the browser carries no provider cost or rates', function () {
+    $user = User::factory()->create();
+    $generation = Generation::factory()->succeeded()->create(['user_id' => $user->id]);
+
+    $json = $this->actingAs($user)->getJson(route('generations.status', $generation))->assertOk()->json();
+
+    expect($json)->toHaveKey('actual_user_cost')
+        ->not->toHaveKeys(['actual_provider_cost', 'estimated_provider_cost', 'rates', 'idempotency_key']);
+
+    $this->actingAs($user)->get(route('dashboard'))->assertInertia(fn ($page) => $page
+        ->has('generations.data.0.actual_user_cost')
+        ->missing('generations.data.0.actual_provider_cost')
+        ->missing('generations.data.0.estimated_provider_cost')
+        ->missing('generations.data.0.rates')
+    );
 });
 
 test('store generation requires sufficient credit balance', function () {

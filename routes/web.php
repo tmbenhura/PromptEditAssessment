@@ -13,7 +13,9 @@ Route::inertia('/', 'Welcome')->name('home');
 Route::middleware(config('auth.require_email_verification') ? ['auth', 'verified'] : ['auth'])->group(function () {
     Route::get('/dashboard', GenerationIndexController::class)->name('dashboard');
     Route::post('/generations', GenerationStoreController::class)->name('generations.store');
-    Route::post('/generations/estimate', GenerationEstimateController::class)->name('generations.estimate');
+    Route::post('/generations/estimate', GenerationEstimateController::class)
+        ->middleware('throttle:120,1')
+        ->name('generations.estimate');
     Route::get('/generations/{generation}/status', GenerationStatusController::class)->name('generations.status');
 
     Route::post('/credits/buy', PurchaseCreditController::class)->name('credits.buy');

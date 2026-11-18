@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 const MAX_REFERENCE_IMAGES = 4;
-const TOKENS_PER_REFERENCE_IMAGE = 765;
 
 const imageUrls = defineModel<string[]>({ required: true });
 
@@ -43,7 +42,7 @@ function removeImageUrl(index: number) {
         <div class="flex items-center justify-between text-xs">
             <Label class="font-medium">Reference Images (Optional)</Label>
             <span class="text-[11px] text-neutral-400">
-                {{ imageUrls.length }}/{{ MAX_REFERENCE_IMAGES }} max ({{ TOKENS_PER_REFERENCE_IMAGE }} tokens ea.)
+                {{ imageUrls.length }}/{{ MAX_REFERENCE_IMAGES }} max
             </span>
         </div>
 

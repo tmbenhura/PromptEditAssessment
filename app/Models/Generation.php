@@ -8,6 +8,7 @@ use App\Enums\GenerationStatus;
 use Carbon\CarbonInterface;
 use Database\Factories\GenerationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -43,6 +44,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $updated_at
  * @property-read User $user
  */
+// Never serialised to the browser: provider costs and rates would reveal the markup.
+#[Hidden([
+    'idempotency_key',
+    'rates',
+    'estimated_provider_cost',
+    'actual_provider_cost',
+])]
 #[Fillable([
     'id',
     'pixelforge_id',

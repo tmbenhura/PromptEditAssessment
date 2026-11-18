@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\InsufficientBalanceException;
+use App\Exceptions\PricingUnavailableException;
 use App\Http\Requests\StoreGenerationRequest;
 use App\Services\Generation\GenerationService;
 use Illuminate\Http\JsonResponse;
@@ -41,6 +42,12 @@ class GenerationStoreController extends Controller
             }
 
             return back()->withErrors(['balance' => $e->getMessage()]);
+        } catch (PricingUnavailableException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['error' => $e->getMessage()], 503);
+            }
+
+            return back()->withErrors(['general' => $e->getMessage()]);
         }
     }
 }

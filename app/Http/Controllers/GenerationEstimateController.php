@@ -4,7 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Enums\GenerationQuality;
 use App\Enums\GenerationSize;
-use App\Services\Pixelforge\PixelforgeClient;
+use App\Exceptions\PricingUnavailableException;
+use App\Services\Pricing\PricingProvider;
 use App\Services\Pricing\CostCalculator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,7 +14,7 @@ class GenerationEstimateController extends Controller
 {
     public function __construct(
         protected CostCalculator $costCalculator,
-        protected PixelforgeClient $pixelforgeClient,
+        protected PricingProvider $pricingProvider,
     ) {}
 
     /**
@@ -34,15 +35,18 @@ class GenerationEstimateController extends Controller
         $quality = GenerationQuality::tryFrom($validated['quality'] ?? 'medium') ?? GenerationQuality::Medium;
         $referenceImages = array_values(array_filter($validated['reference_images'] ?? [], fn ($url) => ! empty($url)));
 
-        $rates = $this->pixelforgeClient->getRates();
-
-        $estimate = $this->costCalculator->estimate(
-            prompt: $prompt,
-            size: $size,
-            quality: $quality,
-            referenceImages: $referenceImages,
-            rates: $rates,
-        );
+        try {
+            // User-facing figures only: no provider costs, rates or markup.
+            $estimate = $this->costCalculator->estimateForUser(
+                prompt: $prompt,
+                size: $size,
+                quality: $quality,
+                referenceImages: $referenceImages,
+                pricing: $this->pricingProvider->current(),
+            );
+        } catch (PricingUnavailableException $e) {
+            return response()->json(['error' => $e->getMessage()], 503);
+        }
 
         return response()->json($estimate);
     }

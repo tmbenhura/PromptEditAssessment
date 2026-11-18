@@ -9,6 +9,18 @@ const props = defineProps<{
     summary: ReportSummary;
 }>();
 
+// The markup in force, e.g. 1.25 -> "25%" markup and a 20% gross margin.
+const markupPercent = computed(() =>
+    formatPercent((Number(props.summary.markup_multiplier) - 1) * 100),
+);
+const marginPercent = computed(() =>
+    formatPercent((1 - 1 / Number(props.summary.markup_multiplier)) * 100),
+);
+
+function formatPercent(value: number): string {
+    return `${Number(value.toFixed(2))}%`;
+}
+
 const reconciliationStatus = computed(() => {
     if (!props.summary.pixelforge_available) {
         return { label: 'Usage unavailable', dotClass: 'bg-neutral-400' };
@@ -45,10 +57,10 @@ const reconciliationStatus = computed(() => {
         </StatCard>
 
         <StatCard
-            title="Net Profit (25% Markup)"
+            :title="`Net Profit (${markupPercent} Markup)`"
             :icon="TrendingUp"
             icon-class="text-primary"
-            caption="20% gross margin on revenue"
+            :caption="`${marginPercent} gross margin on revenue`"
         >
             <div class="text-2xl font-bold text-primary">
                 {{ formatUsd(summary.total_profit_usd, 4) }}

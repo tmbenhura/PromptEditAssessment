@@ -4,8 +4,8 @@ use App\Enums\GenerationStatus;
 use App\Jobs\SubmitGeneration;
 use App\Models\Generation;
 use App\Models\User;
-use App\Services\Pixelforge\PixelforgeClient;
 use App\Services\Pricing\CostCalculator;
+use App\Services\Pricing\PricingProvider;
 use App\Services\Webhooks\WebhookProcessor;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,10 +23,8 @@ const RESERVATION_PROMPT = 'A calm lake at sunrise';
  */
 function maxCostOfTestGeneration(): string
 {
-    $rates = (array) (app(PixelforgeClient::class)->getPricing()['rates'] ?? CostCalculator::DEFAULT_RATES);
-
     return app(CostCalculator::class)
-        ->estimate(RESERVATION_PROMPT, '1024x1024', 'low', [], $rates)['user']['max_cost'];
+        ->estimate(RESERVATION_PROMPT, '1024x1024', 'low', [], app(PricingProvider::class)->current())['user']['max_cost'];
 }
 
 function submitTestGeneration(User $user)

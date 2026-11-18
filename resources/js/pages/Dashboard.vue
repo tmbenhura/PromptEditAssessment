@@ -8,10 +8,10 @@ import GenerationHistory from '@/components/generations/GenerationHistory.vue';
 import ImagePreviewDialog from '@/components/generations/ImagePreviewDialog.vue';
 import { useLivePolling } from '@/composables/useLivePolling';
 import type {
+    CostEstimate,
     PaginatedGenerations,
     QualityOption,
     SizeOption,
-    TokenRates,
 } from '@/types';
 
 const props = defineProps<{
@@ -19,7 +19,7 @@ const props = defineProps<{
     balance: string;
     availableBalance: string;
     heldBalance: string;
-    rates: TokenRates;
+    initialEstimate: CostEstimate | null;
     hasActiveGenerations: boolean;
     sizes: SizeOption[];
     qualities: QualityOption[];
@@ -60,7 +60,7 @@ useLivePolling(() => props.hasActiveGenerations, [
             <div class="lg:col-span-5">
                 <GenerationForm
                     :available-balance="availableBalance"
-                    :rates="rates"
+                    :initial-estimate="initialEstimate"
                     :size-options="sizes"
                     :quality-options="qualities"
                     @buy-credits="isBuyCreditsOpen = true"

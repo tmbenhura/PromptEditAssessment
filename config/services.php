@@ -38,6 +38,13 @@ return [
     'pixelforge' => [
         'api_key' => env('PIXELFORGE_API_KEY'),
         'base_url' => env('PIXELFORGE_BASE_URL', 'https://pixelforge.promptedit.dev/v1'),
+        // What users are charged per dollar Pixelforge charges us: 1.25 = a 25% markup.
+        // A decimal number above zero. Used server-side only and never shown to users.
+        'markup_multiplier' => env('PIXELFORGE_MARKUP_MULTIPLIER', '1.25'),
+
+        // How long fetched pricing is reused before asking Pixelforge again.
+        'pricing_cache_seconds' => (int) env('PIXELFORGE_PRICING_CACHE_SECONDS', 600),
+
         // Set false only on a local machine that lacks a CA bundle. Never in production.
         'verify_ssl' => (bool) env('PIXELFORGE_VERIFY_SSL', true),
         'webhook_secret' => env('PIXELFORGE_WEBHOOK_SECRET', 'whsec_local_secret'),

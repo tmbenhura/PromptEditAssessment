@@ -114,3 +114,12 @@ test('the date range is validated', function (array $query) {
 test('non-admins cannot see the report', function () {
     $this->actingAs(User::factory()->create())->get(route('admin.reports'))->assertForbidden();
 });
+
+test('the report shows the configured markup to admins', function () {
+    config(['services.pixelforge.markup_multiplier' => '1.5']);
+
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $this->actingAs($admin)->get(route('admin.reports'))
+        ->assertInertia(fn ($page) => $page->where('summary.markup_multiplier', '1.5'));
+});

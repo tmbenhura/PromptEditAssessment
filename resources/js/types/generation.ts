@@ -4,9 +4,6 @@ export type ImageSize = '1024x1024' | '1536x1024' | '1024x1536';
 
 export type ImageQuality = 'low' | 'medium' | 'high';
 
-/** Per-million-token prices, keyed by token type (decimal strings from the API). */
-export type TokenRates = Record<string, string>;
-
 export interface TokenUsage {
     input_text_tokens?: number;
     input_image_tokens?: number;
@@ -28,10 +25,7 @@ export interface Generation {
     image_url: string | null;
     image_url_expires_at: string | null;
     usage: TokenUsage | null;
-    rates: TokenRates | null;
-    estimated_provider_cost: string;
     estimated_user_cost: string;
-    actual_provider_cost: string;
     actual_user_cost: string;
     error_code: string | null;
     error_message: string | null;
@@ -61,19 +55,27 @@ export interface QualityOption {
     label: string;
 }
 
-/** What a generation is expected to cost the user, before it is submitted. */
+/**
+ * What a generation is expected to cost the user, worked out by the server before it
+ * is submitted. Amounts are USD decimal strings: exactly what the user will be charged,
+ * with no provider cost, rate or markup.
+ */
 export interface CostEstimate {
-    promptTokens: number;
-    referenceImageTokens: number;
-    outputTokens: number;
-    reasoningTokensMin: number;
-    reasoningTokensMax: number;
-    promptCost: number;
-    referenceImageCost: number;
-    outputCost: number;
-    reasoningCostMin: number;
-    reasoningCostMax: number;
-    minCost: number;
-    typicalCost: number;
-    maxCost: number;
+    tokens: {
+        text: number;
+        image: number;
+        output: number;
+        reasoning_min: number;
+        reasoning_max: number;
+    };
+    costs: {
+        text: string;
+        image: string;
+        output: string;
+        reasoning_min: string;
+        reasoning_max: string;
+        min: string;
+        typical: string;
+        max: string;
+    };
 }

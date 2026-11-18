@@ -7,46 +7,26 @@ use App\Enums\GenerationSize;
 
 class CostCalculator
 {
-    /** @var numeric-string */
-    public const MARKUP_MULTIPLIER = '1.25';
-
-    /** @var array<string, numeric-string> */
-    public const DEFAULT_RATES = [
-        'input_text_tokens' => '5.00',
-        'input_image_tokens' => '10.00',
-        'output_tokens' => '40.00',
-        'reasoning_tokens' => '12.50',
-    ];
+    private const RATE_KEYS = ['input_text_tokens', 'input_image_tokens', 'output_tokens', 'reasoning_tokens'];
 
     /**
-     * @var array<string, array<string, int>>
+     * What users are charged per dollar Pixelforge charges us (services.pixelforge.markup_multiplier).
+     * Kept as an exact decimal string. Never sent to the browser.
+     *
+     * @return numeric-string
      */
-    public const OUTPUT_TOKENS = [
-        'low' => [
-            '1024x1024' => 280,
-            '1536x1024' => 420,
-            '1024x1536' => 420,
-        ],
-        'medium' => [
-            '1024x1024' => 1100,
-            '1536x1024' => 1650,
-            '1024x1536' => 1650,
-        ],
-        'high' => [
-            '1024x1024' => 4300,
-            '1536x1024' => 6450,
-            '1024x1536' => 6450,
-        ],
-    ];
+    public function markupMultiplier(): string
+    {
+        $multiplier = trim((string) (config('services.pixelforge.markup_multiplier') ?? '1.25'));
 
-    /**
-     * @var array<string, array{min: int, max: int}>
-     */
-    public const REASONING_TOKENS = [
-        'low' => ['min' => 0, 'max' => 500],
-        'medium' => ['min' => 200, 'max' => 2000],
-        'high' => ['min' => 1000, 'max' => 8000],
-    ];
+        if (! preg_match('/^\d+(\.\d+)?$/', $multiplier) || bccomp($multiplier, '0', 9) <= 0) {
+            throw new \InvalidArgumentException(
+                "PIXELFORGE_MARKUP_MULTIPLIER must be a positive decimal number, got \"{$multiplier}\".",
+            );
+        }
+
+        return $multiplier;
+    }
 
     /**
      * Calculate exact provider cost from usage and rates.
@@ -62,16 +42,21 @@ class CostCalculator
      */
     public function calculateActualProviderCost(array $usage, array $rates): string
     {
-        $resolvedRates = array_merge(self::DEFAULT_RATES, $rates);
+        // No silent defaults: a missing rate would mean charging the wrong amount.
+        foreach (self::RATE_KEYS as $key) {
+            if (! isset($rates[$key]) || ! is_numeric($rates[$key])) {
+                throw new \InvalidArgumentException("Cannot price usage without a valid {$key} rate.");
+            }
+        }
 
         /** @var numeric-string $textRate */
-        $textRate = (string) $resolvedRates['input_text_tokens'];
+        $textRate = (string) $rates['input_text_tokens'];
         /** @var numeric-string $imageRate */
-        $imageRate = (string) $resolvedRates['input_image_tokens'];
+        $imageRate = (string) $rates['input_image_tokens'];
         /** @var numeric-string $outputRate */
-        $outputRate = (string) $resolvedRates['output_tokens'];
+        $outputRate = (string) $rates['output_tokens'];
         /** @var numeric-string $reasoningRate */
-        $reasoningRate = (string) $resolvedRates['reasoning_tokens'];
+        $reasoningRate = (string) $rates['reasoning_tokens'];
 
         $textCost = $this->calculateTokenCost((int) ($usage['input_text_tokens'] ?? 0), $textRate);
         $imageCost = $this->calculateTokenCost((int) ($usage['input_image_tokens'] ?? 0), $imageRate);
@@ -85,21 +70,23 @@ class CostCalculator
     }
 
     /**
-     * Calculate user charged cost by applying 25% markup to provider cost.
+     * Calculate the user's charge: the provider cost times the configured markup.
      *
      * @param  numeric-string  $providerCost  Exact decimal string
      * @return numeric-string Exact decimal string with 9 decimal places
      */
     public function calculateActualUserCost(string $providerCost): string
     {
-        return bcmul($providerCost, self::MARKUP_MULTIPLIER, 9);
+        return bcmul($providerCost, $this->markupMultiplier(), 9);
     }
 
     /**
-     * Estimate token counts and price ranges for a prompt before generation.
+     * Estimate token counts and price ranges for a prompt before generation, using
+     * the token table and rates Pixelforge publishes. For internal use: it contains
+     * the provider's costs, which users must never see (see estimateForUser()).
      *
      * @param  array<int, string>  $referenceImages
-     * @param  array<string, string>  $rates
+     * @param  array{rates: array<string, string>, tokens: array<string, mixed>}  $pricing
      * @return array{
      *     tokens: array{
      *         estimated_text_tokens: int,
@@ -109,6 +96,7 @@ class CostCalculator
      *         output_tokens: int,
      *         min_reasoning_tokens: int,
      *         max_reasoning_tokens: int,
+     *         estimated_reasoning_tokens: int,
      *     },
      *     provider: array{
      *         min_cost: numeric-string,
@@ -126,48 +114,46 @@ class CostCalculator
         string $prompt,
         GenerationSize|string $size,
         GenerationQuality|string $quality,
-        array $referenceImages = [],
-        array $rates = [],
+        array $referenceImages,
+        array $pricing,
     ): array {
         $sizeKey = $size instanceof GenerationSize ? $size->value : $size;
         $qualityKey = $quality instanceof GenerationQuality ? $quality->value : $quality;
 
-        $resolvedRates = array_merge(self::DEFAULT_RATES, $rates);
+        $rates = $pricing['rates'];
+        $table = $pricing['tokens'];
 
-        $charCount = mb_strlen($prompt);
-        $baseTextTokens = (int) max(1, ceil($charCount / 4));
-        $minTextTokens = (int) max(1, round($baseTextTokens * 0.85));
-        $maxTextTokens = (int) max(1, round($baseTextTokens * 1.15));
+        $outputTokens = $table['output'][$qualityKey][$sizeKey] ?? null;
+        $reasoningRange = $table['reasoning'][$qualityKey] ?? null;
 
-        $imageTokens = count($referenceImages) * 765;
+        if ($outputTokens === null || $reasoningRange === null) {
+            throw new \InvalidArgumentException("The pricing has no token estimate for {$qualityKey} {$sizeKey}.");
+        }
 
-        $outputTokens = self::OUTPUT_TOKENS[$qualityKey][$sizeKey] ?? 1100;
+        $charactersPerToken = max(1, (int) $table['characters_per_text_token']);
+        $variance = (float) $table['text_token_variance'];
 
-        $reasoningRange = self::REASONING_TOKENS[$qualityKey] ?? ['min' => 200, 'max' => 2000];
-        $minReasoningTokens = $reasoningRange['min'];
-        $maxReasoningTokens = $reasoningRange['max'];
+        $baseTextTokens = (int) max(1, ceil(mb_strlen($prompt) / $charactersPerToken));
+        $minTextTokens = (int) max(1, round($baseTextTokens * (1 - $variance)));
+        $maxTextTokens = (int) max(1, round($baseTextTokens * (1 + $variance)));
+
+        $imageTokens = count($referenceImages) * (int) $table['per_reference_image'];
+        $outputTokens = (int) $outputTokens;
+
+        $minReasoningTokens = (int) $reasoningRange['min'];
+        $maxReasoningTokens = (int) $reasoningRange['max'];
         $estimatedReasoningTokens = (int) round(($minReasoningTokens + $maxReasoningTokens) / 2);
 
-        $minProviderCost = $this->calculateActualProviderCost([
-            'input_text_tokens' => $minTextTokens,
+        $costOf = fn (int $textTokens, int $reasoningTokens): string => $this->calculateActualProviderCost([
+            'input_text_tokens' => $textTokens,
             'input_image_tokens' => $imageTokens,
             'output_tokens' => $outputTokens,
-            'reasoning_tokens' => $minReasoningTokens,
-        ], $resolvedRates);
+            'reasoning_tokens' => $reasoningTokens,
+        ], $rates);
 
-        $maxProviderCost = $this->calculateActualProviderCost([
-            'input_text_tokens' => $maxTextTokens,
-            'input_image_tokens' => $imageTokens,
-            'output_tokens' => $outputTokens,
-            'reasoning_tokens' => $maxReasoningTokens,
-        ], $resolvedRates);
-
-        $estimatedProviderCost = $this->calculateActualProviderCost([
-            'input_text_tokens' => $baseTextTokens,
-            'input_image_tokens' => $imageTokens,
-            'output_tokens' => $outputTokens,
-            'reasoning_tokens' => $estimatedReasoningTokens,
-        ], $resolvedRates);
+        $minProviderCost = $costOf($minTextTokens, $minReasoningTokens);
+        $maxProviderCost = $costOf($maxTextTokens, $maxReasoningTokens);
+        $estimatedProviderCost = $costOf($baseTextTokens, $estimatedReasoningTokens);
 
         return [
             'tokens' => [
@@ -178,6 +164,7 @@ class CostCalculator
                 'output_tokens' => $outputTokens,
                 'min_reasoning_tokens' => $minReasoningTokens,
                 'max_reasoning_tokens' => $maxReasoningTokens,
+                'estimated_reasoning_tokens' => $estimatedReasoningTokens,
             ],
             'provider' => [
                 'min_cost' => $minProviderCost,
@@ -188,6 +175,63 @@ class CostCalculator
                 'min_cost' => $this->calculateActualUserCost($minProviderCost),
                 'max_cost' => $this->calculateActualUserCost($maxProviderCost),
                 'estimated_cost' => $this->calculateActualUserCost($estimatedProviderCost),
+            ],
+        ];
+    }
+
+    /**
+     * The estimate as shown to the user: token counts and what they will be charged,
+     * line by line. It carries no provider cost, rate or markup, so the markup can't
+     * be worked out from it.
+     *
+     * @param  array<int, string>  $referenceImages
+     * @param  array{rates: array<string, string>, tokens: array<string, mixed>}  $pricing
+     * @return array{
+     *     tokens: array{text: int, image: int, output: int, reasoning_min: int, reasoning_max: int},
+     *     costs: array{
+     *         text: numeric-string,
+     *         image: numeric-string,
+     *         output: numeric-string,
+     *         reasoning_min: numeric-string,
+     *         reasoning_max: numeric-string,
+     *         min: numeric-string,
+     *         typical: numeric-string,
+     *         max: numeric-string,
+     *     },
+     * }
+     */
+    public function estimateForUser(
+        string $prompt,
+        GenerationSize|string $size,
+        GenerationQuality|string $quality,
+        array $referenceImages,
+        array $pricing,
+    ): array {
+        $estimate = $this->estimate($prompt, $size, $quality, $referenceImages, $pricing);
+        $tokens = $estimate['tokens'];
+        $rates = $pricing['rates'];
+
+        $userCostOf = fn (int $tokenCount, string $rateKey): string => $this->calculateActualUserCost(
+            $this->calculateTokenCost($tokenCount, (string) $rates[$rateKey]),
+        );
+
+        return [
+            'tokens' => [
+                'text' => $tokens['estimated_text_tokens'],
+                'image' => $tokens['image_tokens'],
+                'output' => $tokens['output_tokens'],
+                'reasoning_min' => $tokens['min_reasoning_tokens'],
+                'reasoning_max' => $tokens['max_reasoning_tokens'],
+            ],
+            'costs' => [
+                'text' => $userCostOf($tokens['estimated_text_tokens'], 'input_text_tokens'),
+                'image' => $userCostOf($tokens['image_tokens'], 'input_image_tokens'),
+                'output' => $userCostOf($tokens['output_tokens'], 'output_tokens'),
+                'reasoning_min' => $userCostOf($tokens['min_reasoning_tokens'], 'reasoning_tokens'),
+                'reasoning_max' => $userCostOf($tokens['max_reasoning_tokens'], 'reasoning_tokens'),
+                'min' => $estimate['user']['min_cost'],
+                'typical' => $estimate['user']['estimated_cost'],
+                'max' => $estimate['user']['max_cost'],
             ],
         ];
     }

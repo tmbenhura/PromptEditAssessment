@@ -39,12 +39,23 @@ reconcile command leaves it alone until that time has passed.
 **Pricing and money.** All amounts are exact decimal strings (`decimal(18,9)`) handled with
 bcmath, never floats. Actual cost is computed from the `usage` and the `rates` Pixelforge
 fixed for that generation: `tokens × rate ÷ 1,000,000` per token type, summed exactly,
-then `× 1.25` for the user. Provider cost is never rounded. The user price is exact to
+then times the markup (`PIXELFORGE_MARKUP_MULTIPLIER`, default `1.25`) for the user. Provider cost is never rounded. The user price is exact to
 nine decimals (any finer fraction of a nanodollar is dropped). Failed generations are
 recorded at zero. Pixelforge bills a generation on the UTC day it *completed*, so a charge
 transaction carries `occurred_at` (that completion time) alongside `created_at` (when we
 recorded it, possibly after midnight if the webhook was late). The upfront figure is an estimate (a range plus a typical value); the
 text and reasoning tokens are only known once the generation completes.
+
+**The markup stays server-side.** The browser asks the server for each estimate
+(`POST /generations/estimate`, debounced) and receives only what the user would be charged,
+never a provider cost, rate or the multiplier. Generation records sent to the browser hide
+the provider cost, rates and idempotency key. Only the admin report shows the markup.
+
+**Pricing.** Estimates and the credit hold use Pixelforge's published rates *and* token
+tables (`GET /v1/pricing`), cached for `PIXELFORGE_PRICING_CACHE_SECONDS`. Every distinct
+version is saved in `pricing_snapshots`. If Pixelforge can't be reached, the last pricing
+it confirmed is used; there are no built-in default rates. With nothing stored, new
+generations are refused with a clear message rather than guessed at.
 
 **Balances.** Users start with $20 and can "buy" test credits. While a generation is
 queued or processing, its **maximum** possible cost is held against the balance, so
@@ -102,12 +113,9 @@ verification.
 
 ## Design notes and open questions
 
-- **Rates in estimates.** Estimates and the reserved maximum use the rates from
-  `GET /v1/pricing` (cached 10 minutes). The charge always uses the rates Pixelforge
-  returned for the generation itself.
-- **Token tables.** The per-quality token counts are constants in `CostCalculator` and
-  the Vue estimator, matching the published docs. If Pixelforge changes them they need
-  updating in both places.
+- **Rates in estimates.** Estimates and the reserved maximum use the latest pricing from
+  `GET /v1/pricing`, or the last stored one during an outage. The charge always uses the rates
+  Pixelforge returned for the generation itself.
 - **Lost create response.** If every attempt to create a generation fails, it is marked
   failed at no cost. A response lost *and* never recovered by an idempotent retry could
   leave an accepted generation un-billed locally; the reconcile command only resubmits

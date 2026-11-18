@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\Pixelforge\Exceptions\PixelforgeException;
 use App\Services\Pixelforge\PixelforgeClient;
 use App\Services\Pricing\CostCalculator;
+use App\Services\Pricing\PricingProvider;
 use App\Services\Webhooks\WebhookProcessor;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ class GenerationService
 {
     public function __construct(
         protected PixelforgeClient $pixelforgeClient,
+        protected PricingProvider $pricingProvider,
         protected CostCalculator $costCalculator,
         protected WebhookProcessor $webhookProcessor,
     ) {}
@@ -42,8 +44,10 @@ class GenerationService
         $quality = GenerationQuality::tryFrom($data['quality'] ?? 'medium') ?? GenerationQuality::Medium;
         $referenceImages = array_values(array_filter($data['reference_images'] ?? [], fn ($url) => ! empty($url)));
 
-        // Current rates from Pixelforge (cached)
-        $rates = $this->pixelforgeClient->getRates();
+        // Pixelforge's current pricing, or the last known if it can't be reached
+        // (throws PricingUnavailableException if there has never been any).
+        $pricing = $this->pricingProvider->current();
+        $rates = $pricing['rates'];
 
         // Estimate token counts and prices
         $estimates = $this->costCalculator->estimate(
@@ -51,7 +55,7 @@ class GenerationService
             size: $size,
             quality: $quality,
             referenceImages: $referenceImages,
-            rates: $rates,
+            pricing: $pricing,
         );
 
         $maxEstimatedUserCost = $estimates['user']['max_cost'];

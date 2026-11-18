@@ -7,6 +7,7 @@ use App\Models\Generation;
 use App\Models\User;
 use App\Services\Pixelforge\Exceptions\PixelforgeException;
 use App\Services\Pixelforge\PixelforgeClient;
+use App\Services\Pricing\CostCalculator;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
 
@@ -25,6 +26,7 @@ class FinancialReportService
 
     public function __construct(
         protected PixelforgeClient $pixelforgeClient,
+        protected CostCalculator $costCalculator,
     ) {}
 
     /**
@@ -48,6 +50,7 @@ class FinancialReportService
             'total_user_spend_usd' => self::ZERO,
             'total_profit_usd' => self::ZERO,
             'total_pixelforge_cost_usd' => self::ZERO,
+            'markup_multiplier' => $this->costCalculator->markupMultiplier(),
             'pixelforge_available' => $pixelforgeCosts !== null,
             'all_days_reconciled' => true,
         ];

@@ -6,10 +6,8 @@ use App\Services\Pixelforge\Exceptions\PixelforgeException;
 use App\Services\Pixelforge\Exceptions\PixelforgeOverloadedException;
 use App\Services\Pixelforge\Exceptions\PixelforgePolicyViolationException;
 use App\Services\Pixelforge\Exceptions\PixelforgeRateLimitException;
-use App\Services\Pricing\CostCalculator;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class PixelforgeClient
@@ -31,45 +29,20 @@ class PixelforgeClient
     }
 
     /**
-     * Get published pricing and token configurations (cached for 10 minutes).
+     * Fetch Pixelforge's published pricing and token tables (no authentication needed).
+     * Callers normally want PricingProvider, which caches and stores the result.
      *
      * @return array<string, mixed>
      */
-    public function getPricing(bool $fresh = false): array
+    public function getPricing(): array
     {
-        if ($fresh) {
-            Cache::forget('pixelforge_pricing');
+        $response = $this->request()->get("{$this->baseUrl}/pricing");
+
+        if (! $response->successful()) {
+            throw $this->parseException($response);
         }
 
-        return Cache::remember('pixelforge_pricing', 600, function () {
-            $response = $this->request()->get("{$this->baseUrl}/pricing");
-
-            if (! $response->successful()) {
-                throw $this->parseException($response);
-            }
-
-            return $response->json();
-        });
-    }
-
-    /**
-     * The current per-million-token rates, falling back to the last published
-     * defaults if the pricing endpoint is unreachable so pages still render.
-     *
-     * Generations are billed at the rates Pixelforge fixes when it accepts them
-     * (stored from the create response), so this only drives estimates.
-     *
-     * @return array<string, string>
-     */
-    public function getRates(): array
-    {
-        try {
-            $rates = $this->getPricing()['rates'] ?? null;
-        } catch (PixelforgeException) {
-            $rates = null;
-        }
-
-        return is_array($rates) ? array_merge(CostCalculator::DEFAULT_RATES, $rates) : CostCalculator::DEFAULT_RATES;
+        return (array) $response->json();
     }
 
     /**

@@ -33,6 +33,8 @@ export interface ReportSummary {
     total_user_spend_usd: string;
     total_profit_usd: string;
     total_pixelforge_cost_usd: string;
+    /** What users are charged per $1 Pixelforge charges (1.25 = 25% markup). Admin-only. */
+    markup_multiplier: string;
     pixelforge_available: boolean;
     all_days_reconciled: boolean;
 }

@@ -17,13 +17,13 @@ import {
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useCostEstimate } from '@/composables/useCostEstimate';
-import type { QualityOption, SizeOption, TokenRates } from '@/types';
+import type { CostEstimate, QualityOption, SizeOption } from '@/types';
 
 const MAX_PROMPT_LENGTH = 4000;
 
 const props = defineProps<{
     availableBalance: string;
-    rates: TokenRates;
+    initialEstimate: CostEstimate | null;
     sizeOptions: SizeOption[];
     qualityOptions: QualityOption[];
 }>();
@@ -39,16 +39,22 @@ const form = useForm({
     reference_images: [] as string[],
 });
 
-const { estimate } = useCostEstimate({
-    prompt: () => form.prompt,
-    size: () => form.size,
-    quality: () => form.quality,
-    referenceImageCount: () => form.reference_images.length,
-    rates: () => props.rates,
-});
+// The server works out the estimate (it owns the pricing), so the browser only
+// ever sees what the user will be charged.
+const { estimate, isEstimating, errorMessage } = useCostEstimate(
+    {
+        prompt: () => form.prompt,
+        size: () => form.size,
+        quality: () => form.quality,
+        referenceImages: () => form.reference_images,
+    },
+    props.initialEstimate,
+);
 
 const canAfford = computed(
-    () => Number(props.availableBalance) >= estimate.value.maxCost,
+    () =>
+        estimate.value !== null &&
+        Number(props.availableBalance) >= Number(estimate.value.costs.max),
 );
 
 const sizeButtons = computed(() =>
@@ -127,12 +133,17 @@ function submit() {
 
                 <CostEstimateCard
                     :estimate="estimate"
+                    :is-loading="isEstimating"
+                    :error-message="errorMessage"
                     :can-afford="canAfford"
                     @buy-credits="$emit('buyCredits')"
                 />
 
                 <div v-if="form.errors.balance" class="text-xs font-medium text-rose-500">
                     {{ form.errors.balance }}
+                </div>
+                <div v-if="form.errors.general" class="text-xs font-medium text-rose-500">
+                    {{ form.errors.general }}
                 </div>
             </CardContent>
 
@@ -146,7 +157,9 @@ function submit() {
                     <Sparkles v-else class="h-4 w-4" />
                     <span class="uppercase">
                         Generate
-                        <span class="opacity-50"> ≈ ${{ estimate.typicalCost.toFixed(4) }}</span>
+                        <span v-if="estimate" class="opacity-50">
+                            ≈ ${{ Number(estimate.costs.typical).toFixed(4) }}
+                        </span>
                     </span>
                 </Button>
             </CardFooter>

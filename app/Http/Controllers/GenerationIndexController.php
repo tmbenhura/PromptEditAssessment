@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Enums\GenerationQuality;
 use App\Enums\GenerationSize;
 use App\Enums\GenerationStatus;
-use App\Services\Pixelforge\PixelforgeClient;
+use App\Exceptions\PricingUnavailableException;
+use App\Services\Pricing\CostCalculator;
+use App\Services\Pricing\PricingProvider;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -13,7 +15,8 @@ use Inertia\Response;
 class GenerationIndexController extends Controller
 {
     public function __construct(
-        protected PixelforgeClient $pixelforgeClient,
+        protected PricingProvider $pricingProvider,
+        protected CostCalculator $costCalculator,
     ) {}
 
     /**
@@ -28,7 +31,6 @@ class GenerationIndexController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $rates = $this->pixelforgeClient->getRates();
 
         $hasActive = $user->generations()
             ->whereIn('status', GenerationStatus::pending())
@@ -39,7 +41,8 @@ class GenerationIndexController extends Controller
             'balance' => (string) $user->balance_usd,
             'availableBalance' => $user->availableBalance(),
             'heldBalance' => $user->reservedBalance(),
-            'rates' => $rates,
+            // Estimate for the form's starting values, so it isn't blank on first paint.
+            'initialEstimate' => $this->initialEstimate(),
             'hasActiveGenerations' => $hasActive,
             'sizes' => array_map(fn (GenerationSize $size) => [
                 'value' => $size->value,
@@ -51,5 +54,23 @@ class GenerationIndexController extends Controller
                 'label' => $q->label(),
             ], GenerationQuality::cases()),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function initialEstimate(): ?array
+    {
+        try {
+            return $this->costCalculator->estimateForUser(
+                prompt: '',
+                size: GenerationSize::Square,
+                quality: GenerationQuality::Medium,
+                referenceImages: [],
+                pricing: $this->pricingProvider->current(),
+            );
+        } catch (PricingUnavailableException) {
+            return null;
+        }
     }
 }

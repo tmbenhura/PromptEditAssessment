@@ -1,114 +1,124 @@
 import type { MaybeRefOrGetter } from 'vue';
-import { computed, toValue } from 'vue';
-import type {
-    CostEstimate,
-    ImageQuality,
-    ImageSize,
-    TokenRates,
-} from '@/types';
+import { onBeforeUnmount, onMounted, ref, toValue, watch } from 'vue';
+import type { CostEstimate } from '@/types';
 
-/** Mirrors the server-side CostCalculator; the server remains the source of truth. */
-const USER_MARKUP = 1.25;
-const CHARACTERS_PER_PROMPT_TOKEN = 4;
-const TOKENS_PER_REFERENCE_IMAGE = 765;
-const PROMPT_TOKEN_SPREAD = 0.15;
-const TOKENS_PER_MILLION = 1_000_000;
-
-const DEFAULT_RATES = {
-    input_text_tokens: 5,
-    input_image_tokens: 10,
-    output_tokens: 40,
-    reasoning_tokens: 12.5,
-};
-
-const OUTPUT_TOKENS: Record<ImageQuality, Record<ImageSize, number>> = {
-    low: { '1024x1024': 280, '1536x1024': 420, '1024x1536': 420 },
-    medium: { '1024x1024': 1100, '1536x1024': 1650, '1024x1536': 1650 },
-    high: { '1024x1024': 4300, '1536x1024': 6450, '1024x1536': 6450 },
-};
-
-const REASONING_TOKENS: Record<ImageQuality, { min: number; max: number }> = {
-    low: { min: 0, max: 500 },
-    medium: { min: 200, max: 2000 },
-    high: { min: 1000, max: 8000 },
-};
+const DEBOUNCE_MS = 300;
 
 export interface CostEstimateInput {
     prompt: MaybeRefOrGetter<string>;
     size: MaybeRefOrGetter<string>;
     quality: MaybeRefOrGetter<string>;
-    referenceImageCount: MaybeRefOrGetter<number>;
-    rates: MaybeRefOrGetter<TokenRates>;
+    referenceImages: MaybeRefOrGetter<string[]>;
+}
+
+function xsrfToken(): string {
+    const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+
+    return match ? decodeURIComponent(match[1]) : '';
 }
 
 /**
- * Live, client-side estimate of what a generation will cost the user.
+ * The estimate for the form's current values, asked of the server (which owns the
+ * pricing and the markup) whenever they change, after a short pause in typing.
+ * The previous estimate stays visible while a new one loads.
  */
-export function useCostEstimate(input: CostEstimateInput) {
-    const estimate = computed<CostEstimate>(() => {
-        const rates = toValue(input.rates);
-        const quality = toValue(input.quality) as ImageQuality;
-        const size = toValue(input.size) as ImageSize;
+export function useCostEstimate(
+    input: CostEstimateInput,
+    initialEstimate: CostEstimate | null,
+) {
+    const estimate = ref<CostEstimate | null>(initialEstimate);
+    const isEstimating = ref(false);
+    const errorMessage = ref<string | null>(null);
 
-        // User price of one token of each kind.
-        const priceOf = (rateKey: keyof typeof DEFAULT_RATES): number =>
-            (Number(rates[rateKey] || DEFAULT_RATES[rateKey]) /
-                TOKENS_PER_MILLION) *
-            USER_MARKUP;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let inFlight: AbortController | null = null;
 
-        const promptTokens = Math.max(
-            1,
-            // Pixelforge counts Unicode characters, not UTF-16 units (an emoji is one).
-            Math.ceil(
-                Array.from(toValue(input.prompt)).length /
-                    CHARACTERS_PER_PROMPT_TOKEN,
-            ),
-        );
-        const promptTokensMin = Math.max(
-            1,
-            Math.round(promptTokens * (1 - PROMPT_TOKEN_SPREAD)),
-        );
-        const promptTokensMax = Math.max(
-            1,
-            Math.round(promptTokens * (1 + PROMPT_TOKEN_SPREAD)),
-        );
+    async function fetchEstimate() {
+        inFlight?.abort();
+        const request = new AbortController();
+        inFlight = request;
+        isEstimating.value = true;
 
-        const referenceImageTokens =
-            toValue(input.referenceImageCount) * TOKENS_PER_REFERENCE_IMAGE;
-        const outputTokens = OUTPUT_TOKENS[quality]?.[size] ?? 1100;
-        const reasoning = REASONING_TOKENS[quality] ?? { min: 200, max: 2000 };
+        try {
+            const response = await fetch('/generations/estimate', {
+                method: 'POST',
+                credentials: 'same-origin',
+                signal: request.signal,
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-XSRF-TOKEN': xsrfToken(),
+                },
+                body: JSON.stringify({
+                    prompt: toValue(input.prompt),
+                    size: toValue(input.size),
+                    quality: toValue(input.quality),
+                    reference_images: toValue(input.referenceImages),
+                }),
+            });
 
-        const referenceImageCost =
-            referenceImageTokens * priceOf('input_image_tokens');
-        const outputCost = outputTokens * priceOf('output_tokens');
-        const reasoningPrice = priceOf('reasoning_tokens');
-        const promptPrice = priceOf('input_text_tokens');
+            const body = await response.json().catch(() => ({}));
 
-        const costWith = (promptTokenCount: number, reasoningTokenCount: number) =>
-            promptTokenCount * promptPrice +
-            referenceImageCost +
-            outputCost +
-            reasoningTokenCount * reasoningPrice;
+            if (!response.ok) {
+                // Keep showing the last good estimate unless there never was one.
+                errorMessage.value =
+                    body.error ??
+                    body.message ??
+                    'The estimate could not be updated.';
 
-        return {
-            promptTokens,
-            referenceImageTokens,
-            outputTokens,
-            reasoningTokensMin: reasoning.min,
-            reasoningTokensMax: reasoning.max,
-            promptCost: promptTokens * promptPrice,
-            referenceImageCost,
-            outputCost,
-            reasoningCostMin: reasoning.min * reasoningPrice,
-            reasoningCostMax: reasoning.max * reasoningPrice,
-            minCost: costWith(promptTokensMin, reasoning.min),
-            typicalCost: costWith(
-                promptTokens,
-                (reasoning.min + reasoning.max) / 2,
-            ),
-            maxCost: costWith(promptTokensMax, reasoning.max),
-        };
+                if (response.status === 503) {
+                    estimate.value = null;
+                }
+
+                return;
+            }
+
+            estimate.value = body as CostEstimate;
+            errorMessage.value = null;
+        } catch (error) {
+            if ((error as Error).name !== 'AbortError') {
+                errorMessage.value = 'The estimate could not be updated.';
+            }
+        } finally {
+            if (inFlight === request) {
+                isEstimating.value = false;
+            }
+        }
+    }
+
+    function scheduleFetch() {
+        if (debounceTimer) {
+            clearTimeout(debounceTimer);
+        }
+
+        debounceTimer = setTimeout(fetchEstimate, DEBOUNCE_MS);
+    }
+
+    watch(
+        () => [
+            toValue(input.prompt),
+            toValue(input.size),
+            toValue(input.quality),
+            toValue(input.referenceImages).join('\n'),
+        ],
+        scheduleFetch,
+    );
+
+    // The server normally sends an estimate for the starting values; ask for one now if
+    // it couldn't (for example, pricing was unavailable when the page loaded).
+    onMounted(() => {
+        if (estimate.value === null) {
+            fetchEstimate();
+        }
     });
 
-    return { estimate };
+    onBeforeUnmount(() => {
+        if (debounceTimer) {
+            clearTimeout(debounceTimer);
+        }
+        inFlight?.abort();
+    });
+
+    return { estimate, isEstimating, errorMessage };
 }
