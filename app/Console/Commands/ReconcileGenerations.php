@@ -5,7 +5,9 @@ namespace App\Console\Commands;
 use App\Enums\GenerationStatus;
 use App\Jobs\SubmitGeneration;
 use App\Models\Generation;
+use App\Models\WebhookEvent;
 use App\Services\Generation\GenerationService;
+use App\Services\Webhooks\WebhookProcessor;
 use Illuminate\Console\Command;
 
 /**
@@ -14,6 +16,7 @@ use Illuminate\Console\Command;
  * its maximum cost held against the user's balance.
  *
  * - Accepted generations that have been quiet for a while are polled directly.
+ * - Webhooks that were logged but never applied are replayed from their stored payload.
  * - Generations whose submission job was lost are submitted again (the stored
  *   idempotency key makes that safe).
  */
@@ -24,7 +27,7 @@ class ReconcileGenerations extends Command
 
     protected $description = 'Poll quiet in-flight generations and resubmit orphaned ones';
 
-    public function handle(GenerationService $generationService): int
+    public function handle(GenerationService $generationService, WebhookProcessor $webhookProcessor): int
     {
         $staleAfter = max(1, (int) config('services.pixelforge.reconcile.stale_after', 120));
         $resubmitAfter = max(1, (int) config('services.pixelforge.reconcile.resubmit_after', 900));
@@ -50,10 +53,27 @@ class ReconcileGenerations extends Command
             ->limit($maxPerRun)
             ->get();
 
+        // Webhooks acknowledged but not applied (the deferred work failed or was cut off).
+        // Their payloads are stored, so apply them again.
+        $unfinishedEvents = WebhookEvent::query()
+            ->unfinishedBefore(now()->subSeconds(max(1, (int) config('services.pixelforge.reconcile.replay_after', 60))))
+            ->oldest('last_received_at')
+            ->limit($maxPerRun)
+            ->get();
+
         if ($this->option('dry-run')) {
-            $this->info("{$quiet->count()} generation(s) would be polled, {$orphaned->count()} resubmitted.");
+            $this->info("{$quiet->count()} generation(s) would be polled, {$orphaned->count()} resubmitted, {$unfinishedEvents->count()} webhook event(s) replayed.");
 
             return self::SUCCESS;
+        }
+
+        $replayed = 0;
+        foreach ($unfinishedEvents as $event) {
+            try {
+                $replayed += $webhookProcessor->processEvent($event) ? 1 : 0;
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         foreach ($quiet as $generation) {
@@ -72,7 +92,7 @@ class ReconcileGenerations extends Command
             SubmitGeneration::dispatch($generation->id);
         }
 
-        $this->info("Polled {$quiet->count()} generation(s), resubmitted {$orphaned->count()}.");
+        $this->info("Polled {$quiet->count()} generation(s), resubmitted {$orphaned->count()}, replayed {$replayed} webhook event(s).");
 
         return self::SUCCESS;
     }

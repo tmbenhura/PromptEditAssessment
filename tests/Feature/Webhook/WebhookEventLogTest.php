@@ -1,14 +1,20 @@
 <?php
 
 use App\Console\Commands\PruneWebhookEvents;
+use App\Enums\GenerationStatus;
 use App\Models\Generation;
 use App\Models\WebhookEvent;
+use App\Services\Pricing\CostCalculator;
 use App\Services\Webhooks\WebhookProcessor;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-function sendSignedWebhook(array $event)
+// The controller applies events in defer(), after the response. Run it inline here.
+beforeEach(fn () => $this->withoutDefer());
+
+function sendSignedWebhook(array $event, ?int $deliveryAttempt = null)
 {
     $secret = 'test_secret';
     config()->set('services.pixelforge.webhook_secret', $secret);
@@ -16,10 +22,11 @@ function sendSignedWebhook(array $event)
     $raw = json_encode($event);
     $t = time();
 
-    return test()->call('POST', '/webhooks/pixelforge', server: [
+    return test()->call('POST', '/webhooks/pixelforge', server: array_filter([
         'HTTP_PIXELFORGE_SIGNATURE' => "t={$t},v1=".hash_hmac('sha256', "{$t}.{$raw}", $secret),
+        'HTTP_PIXELFORGE_DELIVERY_ATTEMPT' => $deliveryAttempt,
         'CONTENT_TYPE' => 'application/json',
-    ], content: $raw);
+    ]), content: $raw);
 }
 
 function eventPayload(string $id, Generation $generation, string $status = 'processing'): array
@@ -99,7 +106,7 @@ test('a failure is logged and the retry then processes the event', function () {
     $payload = eventPayload('evt_fail', $generation);
 
     // Make applying the update blow up once.
-    $processor = new class(app(\App\Services\Pricing\CostCalculator::class)) extends WebhookProcessor
+    $processor = new class(app(CostCalculator::class)) extends WebhookProcessor
     {
         public function applyGenerationUpdate(Generation $generation, array $data): void
         {
@@ -214,7 +221,7 @@ test('a non-numeric days option is rejected', function () {
 });
 
 test('the prune command is scheduled daily', function () {
-    $scheduled = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())
+    $scheduled = collect(app(Schedule::class)->events())
         ->first(fn ($event) => str_contains($event->command, 'webhook-events:prune'));
 
     expect($scheduled)->not->toBeNull()
@@ -238,4 +245,77 @@ test('an event with neither a generation id nor metadata matches nothing', funct
     ])->assertNoContent();
 
     expect(WebhookEvent::query()->sole()->generation_id)->toBeNull();
+});
+
+test('the delivery attempt number is stored and follows the latest redelivery', function () {
+    $generation = Generation::factory()->create();
+    $payload = eventPayload('evt_attempts', $generation);
+
+    sendSignedWebhook($payload, 1)->assertNoContent();
+    expect(WebhookEvent::query()->sole()->delivery_attempt)->toBe(1);
+
+    sendSignedWebhook($payload, 3)->assertNoContent();
+
+    $event = WebhookEvent::query()->sole();
+    expect($event->delivery_attempt)->toBe(3)->and($event->delivery_count)->toBe(2);
+});
+
+test('a missing delivery attempt header is stored as null', function () {
+    sendSignedWebhook(['id' => 'evt_noheader', 'type' => 'ping'])->assertNoContent();
+
+    expect(WebhookEvent::query()->sole()->delivery_attempt)->toBeNull();
+});
+
+test('a failure while applying the event is still acknowledged with a 2xx and recorded', function () {
+    $generation = Generation::factory()->create();
+
+    // Applying the update blows up, but only after the response has been decided.
+    app()->instance(WebhookProcessor::class, new class(app(CostCalculator::class)) extends WebhookProcessor
+    {
+        public function applyGenerationUpdate(Generation $generation, array $data): void
+        {
+            throw new RuntimeException('boom');
+        }
+    });
+
+    sendSignedWebhook(eventPayload('evt_late_fail', $generation))->assertNoContent();
+
+    $event = WebhookEvent::query()->sole();
+    expect($event->outcome)->toBe(WebhookEvent::OUTCOME_FAILED)
+        ->and($event->error)->toBe('boom');
+});
+
+test('an event is logged as received before it is applied', function () {
+    $generation = Generation::factory()->create();
+
+    $event = app(WebhookProcessor::class)->receive(eventPayload('evt_two_step', $generation), 2);
+
+    expect($event->outcome)->toBe(WebhookEvent::OUTCOME_RECEIVED)
+        ->and($event->delivery_attempt)->toBe(2)
+        ->and($event->processed_at)->toBeNull();
+
+    expect(app(WebhookProcessor::class)->processEvent($event))->toBeTrue()
+        ->and($event->fresh()->outcome)->toBe(WebhookEvent::OUTCOME_PROCESSED)
+        ->and($event->fresh()->processed_at)->not->toBeNull();
+
+    // Applying it a second time does nothing.
+    expect(app(WebhookProcessor::class)->processEvent($event))->toBeFalse();
+});
+
+test('reconcile replays events that were acknowledged but never applied', function () {
+    $generation = Generation::factory()->create(['status' => GenerationStatus::Queued]);
+
+    $event = app(WebhookProcessor::class)->receive(eventPayload('evt_stuck', $generation), 1);
+    $event->forceFill(['last_received_at' => now()->subMinutes(5)])->save();
+
+    // Too fresh to replay: its own deferred work may still be running.
+    $fresh = app(WebhookProcessor::class)->receive(eventPayload('evt_fresh', Generation::factory()->create()), 1);
+
+    $this->artisan('generations:reconcile')
+        ->expectsOutputToContain('replayed 1 webhook event(s)')
+        ->assertSuccessful();
+
+    expect($event->fresh()->outcome)->toBe(WebhookEvent::OUTCOME_PROCESSED)
+        ->and($generation->fresh()->status)->toBe(GenerationStatus::Processing)
+        ->and($fresh->fresh()->outcome)->toBe(WebhookEvent::OUTCOME_RECEIVED);
 });

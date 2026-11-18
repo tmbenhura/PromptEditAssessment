@@ -92,6 +92,9 @@ return [
             // submission.unique_for so a job that is still retrying is left alone.
             'resubmit_after' => (int) env('PIXELFORGE_RECONCILE_RESUBMIT_AFTER', 900),
 
+            // Replay a webhook that was acknowledged but never applied after this long.
+            'replay_after' => (int) env('PIXELFORGE_RECONCILE_REPLAY_AFTER', 60),
+
             // Most generations handled per run, to stay well inside the 60/min API limit.
             'max_per_run' => (int) env('PIXELFORGE_RECONCILE_MAX_PER_RUN', 30),
         ],

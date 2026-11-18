@@ -3,6 +3,7 @@
 use App\Enums\GenerationStatus;
 use App\Jobs\SubmitGeneration;
 use App\Models\Generation;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
@@ -28,7 +29,7 @@ test('only quiet in-flight generations are picked up for polling', function () {
         ->forceFill(['updated_at' => now()->subHour()])->saveQuietly();
 
     $this->artisan('generations:reconcile --dry-run')
-        ->expectsOutputToContain('1 generation(s) would be polled, 0 resubmitted.')
+        ->expectsOutputToContain('1 generation(s) would be polled, 0 resubmitted, 0 webhook event(s) replayed.')
         ->assertSuccessful();
 });
 
@@ -60,7 +61,7 @@ test('polling a generation Pixelforge does not know leaves it alone but defers t
 });
 
 test('the reconcile command is scheduled every minute', function () {
-    $event = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())
+    $event = collect(app(Schedule::class)->events())
         ->first(fn ($event) => str_contains($event->command, 'generations:reconcile'));
 
     expect($event)->not->toBeNull()->and($event->expression)->toBe('* * * * *');

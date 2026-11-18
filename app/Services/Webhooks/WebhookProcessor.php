@@ -56,62 +56,107 @@ class WebhookProcessor
     }
 
     /**
-     * Process an incoming webhook payload idempotently.
-     *
-     * Every authenticated delivery is recorded in webhook_events (one row per event
-     * id; redeliveries bump delivery_count), whatever happens to it afterwards.
+     * Record and process a webhook in one go (what the controller does in two steps,
+     * with the processing deferred until after the response).
      *
      * @param  array<string, mixed>  $payload
      * @return bool True if processed, false if deduplicated or skipped
      */
-    public function process(array $payload): bool
+    public function process(array $payload, ?int $deliveryAttempt = null): bool
+    {
+        $event = $this->receive($payload, $deliveryAttempt);
+
+        return $event !== null && $this->processEvent($event);
+    }
+
+    /**
+     * Step one, quick and synchronous: durably log the delivery before acknowledging it.
+     *
+     * Every authenticated delivery gets a row in webhook_events (one per event id;
+     * redeliveries bump delivery_count and remember Pixelforge's attempt number).
+     *
+     * @param  array<string, mixed>  $payload
+     * @return WebhookEvent|null The event still to be processed, or null if there is
+     *                           nothing (more) to do, e.g. a redelivery of a handled event
+     */
+    public function receive(array $payload, ?int $deliveryAttempt = null): ?WebhookEvent
     {
         $eventId = (string) ($payload['id'] ?? '');
         $eventType = (string) ($payload['type'] ?? '');
 
         if ($eventId === '') {
             // Nothing to dedupe on, but still worth keeping a record of.
-            $this->recordEvent('missing-'.Str::uuid(), $eventType, $payload, WebhookEvent::OUTCOME_IGNORED);
+            WebhookEvent::create([
+                'event_id' => 'missing-'.Str::uuid(),
+                'event_type' => $eventType,
+                'payload' => $payload,
+                'outcome' => WebhookEvent::OUTCOME_IGNORED,
+                'processed_at' => now(),
+            ])->forceFill([
+                'delivery_attempt' => $deliveryAttempt,
+                'last_received_at' => now(),
+            ])->save();
 
-            return false;
+            return null;
         }
 
-        try {
-            return DB::transaction(function () use ($eventId, $eventType, $payload): bool {
-                $existing = WebhookEvent::query()->where('event_id', $eventId)->lockForUpdate()->first();
+        return DB::transaction(function () use ($eventId, $eventType, $payload, $deliveryAttempt): ?WebhookEvent {
+            $existing = WebhookEvent::query()->where('event_id', $eventId)->lockForUpdate()->first();
 
-                if ($existing !== null && $existing->outcome !== WebhookEvent::OUTCOME_FAILED) {
-                    // Redelivery: remember that it happened, but never apply it twice.
-                    $existing->forceFill([
-                        'delivery_count' => $existing->delivery_count + 1,
-                        'last_received_at' => now(),
-                    ])->save();
-
-                    return false;
-                }
-
-                // A first delivery, or the retry of one that failed earlier.
-                $event = $existing ?? new WebhookEvent(['event_id' => $eventId]);
-                $event->fill([
-                    'event_type' => $eventType,
-                    'payload' => $payload,
-                    'outcome' => WebhookEvent::OUTCOME_PROCESSED,
-                    'error' => null,
-                    'processed_at' => now(),
-                ])->forceFill([
-                    'delivery_count' => ($existing?->delivery_count ?? 0) + 1,
+            if ($existing !== null) {
+                $existing->forceFill([
+                    'delivery_count' => $existing->delivery_count + 1,
+                    'delivery_attempt' => $deliveryAttempt ?? $existing->delivery_attempt,
                     'last_received_at' => now(),
                 ])->save();
 
-                if ($eventType === 'ping') {
-                    $event->update(['outcome' => WebhookEvent::OUTCOME_IGNORED]);
+                // A redelivery is only worth processing if the first try never finished.
+                return $existing->isUnfinished() ? $existing : null;
+            }
 
-                    return true;
+            $event = WebhookEvent::create([
+                'event_id' => $eventId,
+                'event_type' => $eventType,
+                'payload' => $payload,
+                'outcome' => WebhookEvent::OUTCOME_RECEIVED,
+            ]);
+
+            $event->forceFill([
+                'delivery_count' => 1,
+                'delivery_attempt' => $deliveryAttempt,
+                'last_received_at' => now(),
+            ])->save();
+
+            return $event;
+        });
+    }
+
+    /**
+     * Step two: apply a logged event. Safe to run twice, concurrently or later (for
+     * example when replaying a failed event): the event row is locked and only an
+     * unfinished event is applied.
+     *
+     * @return bool True if it was applied, false if it was already handled or skipped
+     *
+     * @throws Throwable After recording the failure on the event
+     */
+    public function processEvent(WebhookEvent $event): bool
+    {
+        try {
+            return DB::transaction(function () use ($event): bool {
+                $locked = WebhookEvent::query()->whereKey($event->id)->lockForUpdate()->first();
+
+                if ($locked === null || ! $locked->isUnfinished()) {
+                    return false;
                 }
 
+                $payload = (array) $locked->payload;
                 $generationData = $payload['data']['object'] ?? null;
-                if (! is_array($generationData)) {
-                    $event->update(['outcome' => WebhookEvent::OUTCOME_IGNORED]);
+
+                $locked->forceFill(['error' => null, 'processed_at' => now()]);
+
+                if ($locked->event_type === 'ping' || ! is_array($generationData)) {
+                    $locked->forceFill(['outcome' => WebhookEvent::OUTCOME_IGNORED])->save();
 
                     return true;
                 }
@@ -136,46 +181,31 @@ class WebhookProcessor
                         ->first();
 
                 if (! $generation) {
-                    // Generation not found in DB yet (e.g. webhook arrived before POST returned)
                     Log::warning("Pixelforge webhook received for unknown generation: {$pixelforgeId}");
-                    $event->update(['outcome' => WebhookEvent::OUTCOME_IGNORED]);
+                    $locked->forceFill(['outcome' => WebhookEvent::OUTCOME_IGNORED])->save();
 
                     return true;
                 }
 
-                $event->update(['generation_id' => $generation->id]);
-
                 $this->applyGenerationUpdate($generation, $generationData);
+
+                $locked->forceFill([
+                    'outcome' => WebhookEvent::OUTCOME_PROCESSED,
+                    'generation_id' => $generation->id,
+                ])->save();
 
                 return true;
             });
         } catch (Throwable $e) {
-            // The transaction rolled back, so keep a record of the failure on its own.
-            // Pixelforge will redeliver, and a later success updates this same row.
-            $this->recordEvent($eventId, $eventType, $payload, WebhookEvent::OUTCOME_FAILED, $e->getMessage());
+            // The transaction rolled back and left the event unfinished. Record why, so
+            // it can be replayed (generations:reconcile does, and so does a redelivery).
+            WebhookEvent::query()->whereKey($event->id)->update([
+                'outcome' => WebhookEvent::OUTCOME_FAILED,
+                'error' => $e->getMessage(),
+            ]);
 
             throw $e;
         }
-    }
-
-    /**
-     * Log a delivery that was not (or could not be) processed.
-     *
-     * @param  array<string, mixed>  $payload
-     */
-    protected function recordEvent(string $eventId, string $eventType, array $payload, string $outcome, ?string $error = null): void
-    {
-        $event = WebhookEvent::query()->firstOrNew(['event_id' => $eventId]);
-
-        $event->fill([
-            'event_type' => $eventType,
-            'payload' => $payload,
-            'outcome' => $outcome,
-            'error' => $error,
-        ])->forceFill([
-            'delivery_count' => ($event->exists ? $event->delivery_count : 0) + 1,
-            'last_received_at' => now(),
-        ])->save();
     }
 
     /**
