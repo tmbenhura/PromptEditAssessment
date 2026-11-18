@@ -11,6 +11,18 @@ export interface CostEstimateInput {
     referenceImages: MaybeRefOrGetter<string[]>;
 }
 
+/** Only trust a response that has every figure the card shows. */
+function isCostEstimate(value: unknown): value is CostEstimate {
+    const candidate = value as CostEstimate | null;
+
+    return (
+        typeof candidate?.tokens?.text === 'number' &&
+        typeof candidate?.costs?.typical === 'string' &&
+        typeof candidate?.costs?.min === 'string' &&
+        typeof candidate?.costs?.max === 'string'
+    );
+}
+
 function xsrfToken(): string {
     const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
 
@@ -31,19 +43,19 @@ export function useCostEstimate(
     const errorMessage = ref<string | null>(null);
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    let inFlight: AbortController | null = null;
+    let latestRequestId = 0;
+    let isUnmounted = false;
 
     async function fetchEstimate() {
-        inFlight?.abort();
-        const request = new AbortController();
-        inFlight = request;
+        // Several requests can overlap while the user keeps typing. Only the newest one
+        // may update the screen, so older responses are ignored when they arrive.
+        const requestId = ++latestRequestId;
         isEstimating.value = true;
 
         try {
             const response = await fetch('/generations/estimate', {
                 method: 'POST',
                 credentials: 'same-origin',
-                signal: request.signal,
                 headers: {
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
@@ -58,30 +70,34 @@ export function useCostEstimate(
                 }),
             });
 
-            const body = await response.json().catch(() => ({}));
+            const body = await response.json().catch(() => null);
 
-            if (!response.ok) {
-                // Keep showing the last good estimate unless there never was one.
-                errorMessage.value =
-                    body.error ??
-                    body.message ??
-                    'The estimate could not be updated.';
+            if (isUnmounted || requestId !== latestRequestId) {
+                return;
+            }
 
-                if (response.status === 503) {
-                    estimate.value = null;
-                }
+            if (response.ok && isCostEstimate(body)) {
+                estimate.value = body;
+                errorMessage.value = null;
 
                 return;
             }
 
-            estimate.value = body as CostEstimate;
-            errorMessage.value = null;
-        } catch (error) {
-            if ((error as Error).name !== 'AbortError') {
+            console.error('Cost estimate request failed', response.status, body);
+
+            // Keep showing the last good estimate, unless pricing is unavailable.
+            errorMessage.value =
+                body?.error ?? body?.message ?? 'The estimate could not be updated.';
+
+            if (response.status === 503) {
+                estimate.value = null;
+            }
+        } catch {
+            if (!isUnmounted && requestId === latestRequestId) {
                 errorMessage.value = 'The estimate could not be updated.';
             }
         } finally {
-            if (inFlight === request) {
+            if (requestId === latestRequestId) {
                 isEstimating.value = false;
             }
         }
@@ -114,10 +130,11 @@ export function useCostEstimate(
     });
 
     onBeforeUnmount(() => {
+        isUnmounted = true;
+
         if (debounceTimer) {
             clearTimeout(debounceTimer);
         }
-        inFlight?.abort();
     });
 
     return { estimate, isEstimating, errorMessage };
