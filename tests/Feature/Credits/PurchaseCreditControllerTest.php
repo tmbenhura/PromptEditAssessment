@@ -38,3 +38,12 @@ test('user cannot purchase invalid credit amounts', function () {
     $user->refresh();
     expect($user->balance_usd)->toBe('10.000000000');
 });
+
+test('user cannot purchase more than the maximum amount or fractions of a cent', function (mixed $amount) {
+    $user = User::factory()->create(['balance_usd' => '10.000000000']);
+
+    $this->actingAs($user)->post(route('credits.buy'), ['amount' => $amount])
+        ->assertSessionHasErrors('amount');
+
+    expect($user->fresh()->balance_usd)->toBe('10.000000000');
+})->with([1_000_000_000, 1000.01, 5.001]);

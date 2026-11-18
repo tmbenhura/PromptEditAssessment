@@ -41,9 +41,8 @@ class GenerationService
         $quality = GenerationQuality::tryFrom($data['quality'] ?? 'medium') ?? GenerationQuality::Medium;
         $referenceImages = array_values(array_filter($data['reference_images'] ?? [], fn ($url) => ! empty($url)));
 
-        // Fetch current rates from Pixelforge (cached)
-        $pricing = $this->pixelforgeClient->getPricing();
-        $rates = (array) ($pricing['rates'] ?? CostCalculator::DEFAULT_RATES);
+        // Current rates from Pixelforge (cached)
+        $rates = $this->pixelforgeClient->getRates();
 
         // Estimate token counts and prices
         $estimates = $this->costCalculator->estimate(

@@ -5,13 +5,10 @@ use App\Http\Controllers\GenerationEstimateController;
 use App\Http\Controllers\GenerationIndexController;
 use App\Http\Controllers\GenerationStatusController;
 use App\Http\Controllers\GenerationStoreController;
-use App\Http\Controllers\PixelforgeWebhookController;
 use App\Http\Controllers\PurchaseCreditController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
-
-Route::post('/webhooks/pixelforge', PixelforgeWebhookController::class)->name('webhooks.pixelforge');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', GenerationIndexController::class)->name('dashboard');

@@ -38,6 +38,8 @@ return [
     'pixelforge' => [
         'api_key' => env('PIXELFORGE_API_KEY'),
         'base_url' => env('PIXELFORGE_BASE_URL', 'https://pixelforge.promptedit.dev/v1'),
+        // Set false only on a local machine that lacks a CA bundle. Never in production.
+        'verify_ssl' => (bool) env('PIXELFORGE_VERIFY_SSL', true),
         'webhook_secret' => env('PIXELFORGE_WEBHOOK_SECRET', 'whsec_local_secret'),
 
         /*

@@ -58,8 +58,10 @@ export function useCostEstimate(input: CostEstimateInput) {
 
         const promptTokens = Math.max(
             1,
+            // Pixelforge counts Unicode characters, not UTF-16 units (an emoji is one).
             Math.ceil(
-                toValue(input.prompt).length / CHARACTERS_PER_PROMPT_TOKEN,
+                Array.from(toValue(input.prompt)).length /
+                    CHARACTERS_PER_PROMPT_TOKEN,
             ),
         );
         const promptTokensMin = Math.max(

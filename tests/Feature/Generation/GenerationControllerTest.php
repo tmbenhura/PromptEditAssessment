@@ -151,3 +151,15 @@ test('status endpoint prohibits unauthorized user', function () {
 
     $response->assertForbidden();
 });
+
+test('reference images must be http or https urls', function () {
+    Queue::fake();
+    $user = User::factory()->create(['balance_usd' => '100.000000000']);
+
+    $this->actingAs($user)->post(route('generations.store'), [
+        'prompt' => 'A calm lake',
+        'reference_images' => ['ftp://example.com/a.png'],
+    ])->assertSessionHasErrors('reference_images.0');
+
+    Queue::assertNothingPushed();
+});

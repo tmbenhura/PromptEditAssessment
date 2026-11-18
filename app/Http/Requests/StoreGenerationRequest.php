@@ -24,7 +24,7 @@ class StoreGenerationRequest extends FormRequest
             'size' => ['nullable', 'string', Rule::enum(GenerationSize::class)],
             'quality' => ['nullable', 'string', Rule::enum(GenerationQuality::class)],
             'reference_images' => ['nullable', 'array', 'max:4'],
-            'reference_images.*' => ['required', 'url', 'max:1000'],
+            'reference_images.*' => ['required', 'string', 'url:http,https', 'max:1000'],
         ];
     }
 }

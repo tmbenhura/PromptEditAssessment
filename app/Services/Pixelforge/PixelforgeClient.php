@@ -6,6 +6,7 @@ use App\Services\Pixelforge\Exceptions\PixelforgeException;
 use App\Services\Pixelforge\Exceptions\PixelforgeOverloadedException;
 use App\Services\Pixelforge\Exceptions\PixelforgePolicyViolationException;
 use App\Services\Pixelforge\Exceptions\PixelforgeRateLimitException;
+use App\Services\Pricing\CostCalculator;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -30,7 +31,7 @@ class PixelforgeClient
     }
 
     /**
-     * Get published pricing and token configurations (cached for 1 hour).
+     * Get published pricing and token configurations (cached for 10 minutes).
      *
      * @return array<string, mixed>
      */
@@ -40,10 +41,8 @@ class PixelforgeClient
             Cache::forget('pixelforge_pricing');
         }
 
-        return Cache::remember('pixelforge_pricing', 3600, function () {
-            $response = Http::withoutVerifying()
-                ->timeout($this->timeout)
-                ->get("{$this->baseUrl}/pricing");
+        return Cache::remember('pixelforge_pricing', 600, function () {
+            $response = $this->request()->get("{$this->baseUrl}/pricing");
 
             if (! $response->successful()) {
                 throw $this->parseException($response);
@@ -51,6 +50,26 @@ class PixelforgeClient
 
             return $response->json();
         });
+    }
+
+    /**
+     * The current per-million-token rates, falling back to the last published
+     * defaults if the pricing endpoint is unreachable so pages still render.
+     *
+     * Generations are billed at the rates Pixelforge fixes when it accepts them
+     * (stored from the create response), so this only drives estimates.
+     *
+     * @return array<string, string>
+     */
+    public function getRates(): array
+    {
+        try {
+            $rates = $this->getPricing()['rates'] ?? null;
+        } catch (PixelforgeException) {
+            $rates = null;
+        }
+
+        return is_array($rates) ? array_merge(CostCalculator::DEFAULT_RATES, $rates) : CostCalculator::DEFAULT_RATES;
     }
 
     /**
@@ -146,11 +165,20 @@ class PixelforgeClient
 
     protected function authenticatedRequest(): PendingRequest
     {
-        return Http::withoutVerifying()
-            ->timeout($this->timeout)
+        return $this->request()
             ->withToken($this->apiKey)
             ->acceptJson()
             ->asJson();
+    }
+
+    /**
+     * TLS certificates are verified unless PIXELFORGE_VERIFY_SSL=false, which exists
+     * only for local machines without a CA bundle and must never be set in production.
+     */
+    protected function request(): PendingRequest
+    {
+        return Http::timeout($this->timeout)
+            ->withOptions(['verify' => (bool) config('services.pixelforge.verify_ssl', true)]);
     }
 
     protected function parseException(Response $response): PixelforgeException

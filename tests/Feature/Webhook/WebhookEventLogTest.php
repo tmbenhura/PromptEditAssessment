@@ -220,3 +220,22 @@ test('the prune command is scheduled daily', function () {
     expect($scheduled)->not->toBeNull()
         ->and($scheduled->expression)->toBe('0 3 * * *');
 });
+
+test('the webhook route does not start a session', function () {
+    $response = sendSignedWebhook(['id' => 'evt_nosession', 'type' => 'ping']);
+
+    $response->assertNoContent();
+    expect($response->headers->getCookies())->toBeEmpty();
+});
+
+test('an event with neither a generation id nor metadata matches nothing', function () {
+    Generation::factory()->create();
+
+    sendSignedWebhook([
+        'id' => 'evt_blank',
+        'type' => 'generation.succeeded',
+        'data' => ['object' => ['status' => 'succeeded']],
+    ])->assertNoContent();
+
+    expect(WebhookEvent::query()->sole()->generation_id)->toBeNull();
+});

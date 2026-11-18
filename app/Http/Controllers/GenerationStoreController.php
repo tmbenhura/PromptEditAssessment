@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Exceptions\InsufficientBalanceException;
 use App\Http\Requests\StoreGenerationRequest;
 use App\Services\Generation\GenerationService;
-use App\Services\Pixelforge\Exceptions\PixelforgeException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 
@@ -42,12 +41,6 @@ class GenerationStoreController extends Controller
             }
 
             return back()->withErrors(['balance' => $e->getMessage()]);
-        } catch (PixelforgeException $e) {
-            if ($request->wantsJson()) {
-                return response()->json(['error' => $e->getMessage()], (int) ($e->getCode() ?: 500));
-            }
-
-            return back()->withErrors(['general' => $e->getMessage()]);
         }
     }
 }

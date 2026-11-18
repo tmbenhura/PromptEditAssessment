@@ -119,16 +119,21 @@ class WebhookProcessor
                 $pixelforgeId = (string) ($generationData['id'] ?? '');
                 $appGenerationId = $generationData['metadata']['app_generation_id'] ?? null;
 
-                // Find generation by Pixelforge ID or metadata app_generation_id
-                $query = Generation::query();
-                if ($pixelforgeId !== '') {
-                    $query->where('pixelforge_id', $pixelforgeId);
-                }
-                if ($appGenerationId !== null) {
-                    $query->orWhere('id', (string) $appGenerationId);
-                }
-
-                $generation = $query->lockForUpdate()->first();
+                // Find the generation by Pixelforge ID, or by the id we sent as metadata
+                // (the event can arrive before our create request has returned).
+                $generation = ($pixelforgeId === '' && $appGenerationId === null)
+                    ? null
+                    : Generation::query()
+                        ->where(function ($query) use ($pixelforgeId, $appGenerationId): void {
+                            if ($pixelforgeId !== '') {
+                                $query->where('pixelforge_id', $pixelforgeId);
+                            }
+                            if ($appGenerationId !== null) {
+                                $query->orWhere('id', (string) $appGenerationId);
+                            }
+                        })
+                        ->lockForUpdate()
+                        ->first();
 
                 if (! $generation) {
                     // Generation not found in DB yet (e.g. webhook arrived before POST returned)

@@ -7,6 +7,8 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class PurchaseCreditRequest extends FormRequest
 {
+    public const MAX_AMOUNT_USD = 1000;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -23,7 +25,8 @@ class PurchaseCreditRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'amount' => ['required', 'numeric', 'gt:0'],
+            // Capped so a typo (or abuse) can't overflow the decimal(18,9) balance column.
+            'amount' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:'.self::MAX_AMOUNT_USD],
         ];
     }
 }

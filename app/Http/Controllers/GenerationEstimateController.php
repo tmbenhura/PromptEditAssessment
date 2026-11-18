@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Enums\GenerationQuality;
 use App\Enums\GenerationSize;
 use App\Services\Pixelforge\PixelforgeClient;
-use App\Services\Pricing\CostCalculator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,7 +25,7 @@ class GenerationEstimateController extends Controller
             'size' => ['nullable', 'string'],
             'quality' => ['nullable', 'string'],
             'reference_images' => ['nullable', 'array', 'max:4'],
-            'reference_images.*' => ['nullable', 'url'],
+            'reference_images.*' => ['nullable', 'url:http,https'],
         ]);
 
         $prompt = (string) ($validated['prompt'] ?? '');
@@ -34,8 +33,7 @@ class GenerationEstimateController extends Controller
         $quality = GenerationQuality::tryFrom($validated['quality'] ?? 'medium') ?? GenerationQuality::Medium;
         $referenceImages = array_values(array_filter($validated['reference_images'] ?? [], fn ($url) => ! empty($url)));
 
-        $pricing = $this->pixelforgeClient->getPricing();
-        $rates = (array) ($pricing['rates'] ?? CostCalculator::DEFAULT_RATES);
+        $rates = $this->pixelforgeClient->getRates();
 
         $estimate = $this->costCalculator->estimate(
             prompt: $prompt,

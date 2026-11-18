@@ -7,7 +7,6 @@ use App\Enums\GenerationSize;
 use App\Enums\GenerationStatus;
 use App\Services\Generation\GenerationService;
 use App\Services\Pixelforge\PixelforgeClient;
-use App\Services\Pricing\CostCalculator;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -40,8 +39,7 @@ class GenerationIndexController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $pricing = $this->pixelforgeClient->getPricing();
-        $rates = (array) ($pricing['rates'] ?? CostCalculator::DEFAULT_RATES);
+        $rates = $this->pixelforgeClient->getRates();
 
         $hasActive = $user->generations()
             ->whereIn('status', [GenerationStatus::Queued, GenerationStatus::Processing])
