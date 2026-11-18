@@ -2,6 +2,8 @@
 
 namespace App\Services\Pricing;
 
+use App\Enums\GenerationQuality;
+use App\Enums\GenerationSize;
 use App\Exceptions\PricingUnavailableException;
 use App\Models\PricingSnapshot;
 use App\Services\Pixelforge\Exceptions\PixelforgeException;
@@ -128,6 +130,20 @@ class PricingProvider
         foreach (['characters_per_text_token', 'text_token_variance', 'per_reference_image', 'output', 'reasoning'] as $key) {
             if (! isset($tokens[$key])) {
                 throw new \UnexpectedValueException("The pricing response has no {$key} in its token table.");
+            }
+        }
+
+        // Every quality and size we offer needs an estimate, or a user could pick one
+        // that can't be priced.
+        foreach (GenerationQuality::cases() as $quality) {
+            if (! isset($tokens['reasoning'][$quality->value]['min'], $tokens['reasoning'][$quality->value]['max'])) {
+                throw new \UnexpectedValueException("The pricing response has no reasoning range for {$quality->value} quality.");
+            }
+
+            foreach (GenerationSize::cases() as $size) {
+                if (! isset($tokens['output'][$quality->value][$size->value])) {
+                    throw new \UnexpectedValueException("The pricing response has no output tokens for {$quality->value} {$size->value}.");
+                }
             }
         }
 

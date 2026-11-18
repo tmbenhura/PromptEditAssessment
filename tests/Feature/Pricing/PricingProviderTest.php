@@ -24,8 +24,16 @@ function pricingPayload(string $outputRate = '40.00'): array
             'characters_per_text_token' => 4,
             'text_token_variance' => 0.15,
             'per_reference_image' => 765,
-            'output' => ['low' => ['1024x1024' => 280]],
-            'reasoning' => ['low' => ['min' => 0, 'max' => 500]],
+            'output' => [
+                'low' => ['1024x1024' => 280, '1536x1024' => 420, '1024x1536' => 420],
+                'medium' => ['1024x1024' => 1100, '1536x1024' => 1650, '1024x1536' => 1650],
+                'high' => ['1024x1024' => 4300, '1536x1024' => 6450, '1024x1536' => 6450],
+            ],
+            'reasoning' => [
+                'low' => ['min' => 0, 'max' => 500],
+                'medium' => ['min' => 200, 'max' => 2000],
+                'high' => ['min' => 1000, 'max' => 8000],
+            ],
         ],
     ];
 }
@@ -108,6 +116,19 @@ test('the last known pricing is used when the response is unusable', function ()
     $pricing = providerWith(pricingClient(['object' => 'pricing', 'rates' => ['output_tokens' => '1.00']]))->current();
 
     expect($pricing['rates']['output_tokens'])->toBe('45.00');
+});
+
+test('pricing missing an estimate for a size we offer is not trusted', function () {
+    providerWith(pricingClient(pricingPayload('45.00')))->current();
+
+    $incomplete = pricingPayload('1.00');
+    unset($incomplete['tokens']['output']['medium']['1536x1024']);
+
+    $pricing = providerWith(pricingClient($incomplete))->current();
+
+    // Falls back to the last complete pricing, and the incomplete one is not stored.
+    expect($pricing['rates']['output_tokens'])->toBe('45.00')
+        ->and(PricingSnapshot::count())->toBe(1);
 });
 
 test('the newest stored pricing wins', function () {
