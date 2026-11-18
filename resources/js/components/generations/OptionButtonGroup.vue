@@ -20,10 +20,10 @@ const groupName = `option-group-${useId()}`;
             <label
                 v-for="option in options"
                 :key="option.value"
-                class="flex cursor-pointer flex-col items-center justify-center rounded-lg border p-2 text-center transition duration-200 hover:border-emerald-500/60 hover:shadow-[0_0_14px_color-mix(in_oklab,var(--color-emerald-500)_40%,transparent)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-emerald-500 has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background"
+                class="flex cursor-pointer flex-col items-center justify-center rounded-lg border p-2 text-center transition duration-200 hover:border-lime-500/60 hover:shadow-[0_0_10px_color-mix(in_oklab,var(--color-lime-500)_10%,transparent)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-lime-500 has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background"
                 :class="
                     selectedValue === option.value
-                        ? 'border-emerald-500 bg-emerald-500/5 text-emerald-800 shadow-[0_0_10px_color-mix(in_oklab,var(--color-emerald-500)_25%,transparent)] ring-2 ring-emerald-500 hover:shadow-[0_0_18px_color-mix(in_oklab,var(--color-emerald-500)_55%,transparent)] dark:text-emerald-300'
+                        ? 'border-white bg-lime-500/5 text-lime-800 shadow-[0_0_10px_color-mix(in_oklab,var(--color-lime-500)_10%,transparent)] ring-2 ring-white hover:shadow-[0_0_15px_color-mix(in_oklab,var(--color-lime-500)_25%,transparent)] dark:text-lime-300'
                         : 'border-neutral-200 dark:border-neutral-800'
                 "
             >
