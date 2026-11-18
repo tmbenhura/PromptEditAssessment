@@ -45,39 +45,44 @@ const imageExpired = computed(
             v-if="generation.status === 'succeeded' && imageExpired"
             class="flex flex-col items-center gap-1.5 p-4 text-center"
         >
-            <ImageOff class="h-7 w-7 text-neutral-400" />
+            <ImageOff aria-hidden="true" class="h-7 w-7 text-neutral-500" />
             <span class="text-xs font-semibold text-neutral-600 dark:text-neutral-300">Image expired</span>
-            <span class="text-[10px] text-neutral-400">Pixelforge links last 24 hours</span>
+            <span class="text-[11px] text-neutral-600 dark:text-neutral-400">Pixelforge links last 24 hours</span>
         </div>
 
         <template v-else-if="generation.status === 'succeeded' && generation.image_url">
-            <img
-                :src="generation.image_url"
-                :alt="generation.prompt"
-                class="h-full w-full cursor-pointer object-cover transition duration-500 ease-in hover:scale-105"
-                @click="$emit('preview', generation.image_url)"
-                @error="imageUnavailable = true"
-            />
             <button
                 type="button"
-                class="absolute bottom-2 right-2 cursor-pointer rounded-full bg-black/60 p-1.5 text-white backdrop-blur-xs transition hover:bg-black/80"
-                title="View Full Resolution"
+                class="group relative block h-full w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                aria-label="View full resolution image"
                 @click="$emit('preview', generation.image_url)"
             >
-                <ZoomIn class="h-3.5 w-3.5" />
+                <img
+                    :src="generation.image_url"
+                    :alt="generation.prompt"
+                    class="h-full w-full object-cover transition duration-500 ease-in group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                    @error="imageUnavailable = true"
+                />
+                <span
+                    aria-hidden="true"
+                    class="absolute bottom-2 right-2 rounded-full bg-black/70 p-1.5 text-white backdrop-blur-xs transition group-hover:bg-black/90"
+                >
+                    <ZoomIn class="h-3.5 w-3.5" />
+                </span>
             </button>
         </template>
 
         <div
             v-else-if="generation.status === 'queued' || generation.status === 'processing'"
+            role="status"
             class="flex flex-col items-center gap-2 p-4 text-center"
         >
-            <Loader2 class="h-7 w-7 animate-spin text-primary" />
+            <Loader2 aria-hidden="true" class="h-7 w-7 animate-spin text-primary motion-reduce:animate-none" />
             <template v-if="waitingForQuota">
                 <span class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
                     Daily limit reached
                 </span>
-                <span class="text-[10px] text-neutral-400">
+                <span class="text-[11px] text-neutral-600 dark:text-neutral-400">
                     Starts automatically at {{ quotaResetTime }} (UTC day resets)
                 </span>
             </template>
@@ -85,17 +90,17 @@ const imageExpired = computed(
                 <span class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
                     {{ generation.status === 'queued' ? 'In Queue' : 'Rendering Image...' }}
                 </span>
-                <span class="text-[10px] text-neutral-400">Waiting</span>
+                <span class="text-[11px] text-neutral-600 dark:text-neutral-400">Waiting</span>
             </template>
         </div>
 
         <div
             v-else-if="generation.status === 'failed'"
-            class="flex flex-col items-center gap-1.5 p-4 text-center text-rose-800"
+            class="flex flex-col items-center gap-1.5 p-4 text-center text-rose-800 dark:text-rose-300"
         >
-            <AlertCircle class="h-7 w-7 text-rose-800" />
+            <AlertCircle aria-hidden="true" class="h-7 w-7" />
             <span class="text-xs font-semibold">Generation Failed</span>
-            <span class="text-[10px] text-neutral-400">No Charge</span>
+            <span class="text-[11px] text-neutral-600 dark:text-neutral-400">No Charge</span>
         </div>
     </div>
 </template>

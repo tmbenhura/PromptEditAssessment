@@ -25,52 +25,58 @@ function toggleDay(date: string) {
                 <div>
                     <CardTitle class="text-base font-semibold">Daily Provider Reconciliation</CardTitle>
                     <CardDescription>
-                        Compares local recorded costs against Pixelforge's official GET /v1/usage report per UTC day. Click a day to see each user.
+                        Compares local recorded costs against Pixelforge's official GET /v1/usage report per UTC day. Use a day's expand button to see each user.
                     </CardDescription>
                 </div>
-                <Badge variant="outline" class="gap-1 border-emerald-500/30 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30">
-                    <CheckCircle2 class="h-3.5 w-3.5" />
+                <Badge variant="outline" class="gap-1 border-emerald-500/30 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+                    <CheckCircle2 aria-hidden="true" class="h-3.5 w-3.5" />
                     Source of Truth: GET /v1/usage
                 </Badge>
             </div>
         </CardHeader>
         <CardContent class="overflow-x-auto">
             <table class="w-full text-left text-sm">
-                <thead class="border-b bg-neutral-50 text-xs font-medium uppercase text-neutral-500 dark:bg-neutral-900">
+                <caption class="sr-only">Daily provider reconciliation by UTC date</caption>
+                <thead class="border-b bg-neutral-50 text-xs font-medium uppercase text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400">
                     <tr>
-                        <th class="w-8 p-3"></th>
-                        <th class="p-3">UTC Date</th>
-                        <th class="p-3">Generations</th>
-                        <th class="p-3">Pixelforge Usage API</th>
-                        <th class="p-3">Local Provider Cost</th>
-                        <th class="p-3">Reconciliation</th>
-                        <th class="p-3">User Spend (Charged)</th>
-                        <th class="p-3">Net Profit</th>
+                        <th scope="col" class="w-8 p-3"><span class="sr-only">Show users</span></th>
+                        <th scope="col" class="p-3">UTC Date</th>
+                        <th scope="col" class="p-3">Generations</th>
+                        <th scope="col" class="p-3">Pixelforge Usage API</th>
+                        <th scope="col" class="p-3">Local Provider Cost</th>
+                        <th scope="col" class="p-3">Reconciliation</th>
+                        <th scope="col" class="p-3">User Spend (Charged)</th>
+                        <th scope="col" class="p-3">Net Profit</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                     <tr v-if="days.length === 0">
-                        <td colspan="8" class="p-4 text-center text-neutral-500">
+                        <td colspan="8" class="p-4 text-center text-neutral-600 dark:text-neutral-400">
                             No generation records found in selected date range.
                         </td>
                     </tr>
                     <template v-for="day in days" :key="day.date">
-                        <tr
-                            class="hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50"
-                            :class="{ 'cursor-pointer': day.users.length > 0 }"
-                            @click="day.users.length > 0 && toggleDay(day.date)"
-                        >
-                            <td class="p-3 text-neutral-400">
-                                <ChevronRight
+                        <tr class="hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50">
+                            <td class="p-1 text-neutral-600 dark:text-neutral-400">
+                                <button
                                     v-if="day.users.length > 0"
-                                    class="h-4 w-4 transition-transform"
-                                    :class="{ 'rotate-90': expandedDate === day.date }"
-                                />
+                                    type="button"
+                                    class="flex h-8 w-8 cursor-pointer items-center justify-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    :aria-expanded="expandedDate === day.date"
+                                    :aria-label="`${expandedDate === day.date ? 'Hide' : 'Show'} users for ${day.date}`"
+                                    @click="toggleDay(day.date)"
+                                >
+                                    <ChevronRight
+                                        aria-hidden="true"
+                                        class="h-4 w-4 transition-transform motion-reduce:transition-none"
+                                        :class="{ 'rotate-90': expandedDate === day.date }"
+                                    />
+                                </button>
                             </td>
-                            <td class="p-3 font-medium">{{ day.date }}</td>
+                            <th scope="row" class="p-3 font-medium">{{ day.date }}</th>
                             <td class="p-3">
                                 <span class="font-semibold">{{ day.generations_count }}</span>
-                                <span v-if="day.failed_count > 0" class="ml-1 text-xs text-rose-500">
+                                <span v-if="day.failed_count > 0" class="ml-1 text-xs text-rose-700 dark:text-rose-400">
                                     ({{ day.failed_count }} failed)
                                 </span>
                             </td>
@@ -82,7 +88,7 @@ function toggleDay(date: string) {
                             <td class="p-3 font-mono text-xs font-medium text-neutral-900 dark:text-neutral-100">
                                 {{ formatUsd(day.user_spend_usd) }}
                             </td>
-                            <td class="p-3 font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                            <td class="p-3 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                                 +{{ formatUsd(day.profit_usd) }}
                             </td>
                         </tr>
@@ -95,14 +101,14 @@ function toggleDay(date: string) {
                             <td class="p-2"></td>
                             <td class="p-2 pl-6" colspan="2">
                                 <span class="font-medium text-neutral-800 dark:text-neutral-200">{{ user.name }}</span>
-                                <span class="ml-1 text-neutral-500">{{ user.email }}</span>
-                                <span class="ml-2 text-neutral-500">· {{ user.generations_count }} generations</span>
+                                <span class="ml-1 text-neutral-600 dark:text-neutral-400">{{ user.email }}</span>
+                                <span class="ml-2 text-neutral-600 dark:text-neutral-400">· {{ user.generations_count }} generations</span>
                             </td>
                             <td class="p-2"></td>
                             <td class="p-2 font-mono">{{ formatUsd(user.provider_cost_usd) }}</td>
                             <td class="p-2"></td>
                             <td class="p-2 font-mono">{{ formatUsd(user.user_spend_usd) }}</td>
-                            <td class="p-2 font-mono text-emerald-600 dark:text-emerald-400">
+                            <td class="p-2 font-mono text-emerald-700 dark:text-emerald-400">
                                 +{{ formatUsd(user.profit_usd) }}
                             </td>
                         </tr>

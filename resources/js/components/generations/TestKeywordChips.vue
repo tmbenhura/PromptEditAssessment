@@ -34,17 +34,18 @@ const testKeywords: TestKeyword[] = [
 </script>
 
 <template>
-    <div class="space-y-1">
-        <div class="text-[11px] font-medium uppercase tracking-wider text-neutral-400">
-            Quick Test Flags:
+    <div class="space-y-1" role="group" aria-labelledby="test-flags-label">
+        <div id="test-flags-label" class="text-[11px] font-medium uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
+            Quick Test Flags
         </div>
         <div class="flex flex-wrap gap-1.5">
             <button
                 v-for="testKeyword in testKeywords"
                 :key="testKeyword.keyword"
                 type="button"
-                class="cursor-pointer rounded px-2 py-0.5 text-xs transition"
+                class="cursor-pointer rounded px-2 py-1 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 :class="testKeyword.classes"
+                :aria-label="`Append ${testKeyword.keyword} to prompt`"
                 @click="$emit('select', testKeyword.keyword)"
             >
                 {{ testKeyword.keyword }}

@@ -4,34 +4,43 @@ import type { CreditTier } from '@/types';
 
 defineProps<{
     tier: CreditTier;
-    selected: boolean;
+    name: string;
 }>();
+
+const selectedAmount = defineModel<number>({ required: true });
 </script>
 
 <template>
-    <button
-        type="button"
-        class="flex items-center justify-between rounded-lg border p-3 text-left transition-all hover:border-neutral-400 dark:hover:border-neutral-600"
+    <label
+        class="flex cursor-pointer items-center justify-between rounded-lg border p-3 text-left transition-all hover:border-neutral-400 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-emerald-500 has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background dark:hover:border-neutral-600"
         :class="
-            selected
-                ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+            selectedAmount === tier.amount
+                ? 'border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/30'
                 : 'border-neutral-200 dark:border-neutral-800'
         "
     >
+        <input
+            v-model="selectedAmount"
+            type="radio"
+            class="sr-only"
+            :name="name"
+            :value="tier.amount"
+        />
         <div class="flex items-center gap-3">
             <div
+                aria-hidden="true"
                 class="flex h-5 w-5 items-center justify-center rounded-full border text-xs"
                 :class="
-                    selected
-                        ? 'border-primary bg-primary text-white'
-                        : 'border-neutral-300 dark:border-neutral-600'
+                    selectedAmount === tier.amount
+                        ? 'border-emerald-600 bg-emerald-600 text-white'
+                        : 'border-neutral-400 dark:border-neutral-500'
                 "
             >
-                <Check v-if="selected" class="h-3 w-3 stroke-[3]" />
+                <Check v-if="selectedAmount === tier.amount" class="h-3 w-3 stroke-[3]" />
             </div>
             <div>
                 <div class="font-medium text-neutral-900 dark:text-neutral-100">{{ tier.label }}</div>
-                <div class="text-xs text-neutral-500">{{ tier.description }}</div>
+                <div class="text-xs text-neutral-600 dark:text-neutral-400">{{ tier.description }}</div>
             </div>
         </div>
 
@@ -41,5 +50,5 @@ defineProps<{
         >
             Most Popular
         </span>
-    </button>
+    </label>
 </template>

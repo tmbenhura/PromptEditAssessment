@@ -58,16 +58,14 @@ function applyDateFilter() {
 <template>
     <Head title="Financial Reports & Reconciliation" />
 
-    <h1 class="sr-only">Financial Reports & Reconciliation</h1>
-
     <div class="flex flex-col gap-6 p-4 md:p-8">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="flex items-center gap-2 text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-                    <BarChart3 class="h-6 w-6 text-primary" />
+                    <BarChart3 aria-hidden="true" class="h-6 w-6 text-primary" />
                     Operator Financial Reports
                 </h1>
-                <p class="text-sm text-neutral-500">
+                <p class="text-sm text-neutral-600 dark:text-neutral-400">
                     Spend, provider costs and exact reconciliation against Pixelforge GET /v1/usage.
                 </p>
             </div>

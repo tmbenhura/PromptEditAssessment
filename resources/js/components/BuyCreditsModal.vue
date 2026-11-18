@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
 import { Coins, Loader2 } from '@lucide/vue';
-import { ref } from 'vue';
+import { ref, useId } from 'vue';
 import CreditTierOption from '@/components/credits/CreditTierOption.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +33,7 @@ const creditTiers: CreditTier[] = [
 
 const selectedAmount = ref(DEFAULT_TIER_AMOUNT);
 const isPurchasing = ref(false);
+const tierGroupName = `credit-tier-${useId()}`;
 
 function purchaseCredits() {
     isPurchasing.value = true;
@@ -58,7 +59,7 @@ function purchaseCredits() {
         <DialogContent class="sm:max-w-md">
             <DialogHeader>
                 <DialogTitle class="flex items-center gap-2">
-                    <Coins class="h-5 w-5 text-amber-500" />
+                    <Coins aria-hidden="true" class="h-5 w-5 text-amber-500" />
                     Buy Test Credits
                 </DialogTitle>
                 <DialogDescription>
@@ -69,22 +70,23 @@ function purchaseCredits() {
             <div class="space-y-4 py-2">
                 <div class="rounded-lg bg-neutral-50 p-3 text-sm dark:bg-neutral-900 border">
                     <div class="flex items-center justify-between">
-                        <span class="text-neutral-500">Current Balance:</span>
+                        <span class="text-neutral-600 dark:text-neutral-400">Current Balance:</span>
                         <span class="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
                             {{ formatUsd(currentBalance, 4) }} USD
                         </span>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 gap-2">
+                <fieldset class="grid grid-cols-1 gap-2">
+                    <legend class="sr-only">Credit amount</legend>
                     <CreditTierOption
                         v-for="tier in creditTiers"
                         :key="tier.amount"
+                        v-model="selectedAmount"
                         :tier="tier"
-                        :selected="selectedAmount === tier.amount"
-                        @click="selectedAmount = tier.amount"
+                        :name="tierGroupName"
                     />
-                </div>
+                </fieldset>
             </div>
 
             <DialogFooter class="sm:justify-between">
@@ -102,7 +104,7 @@ function purchaseCredits() {
                     class="gap-2"
                     @click="purchaseCredits"
                 >
-                    <Loader2 v-if="isPurchasing" class="h-4 w-4 animate-spin" />
+                    <Loader2 v-if="isPurchasing" aria-hidden="true" class="h-4 w-4 animate-spin motion-reduce:animate-none" />
                     <span>Confirm +${{ selectedAmount }} Credits</span>
                 </Button>
             </DialogFooter>
