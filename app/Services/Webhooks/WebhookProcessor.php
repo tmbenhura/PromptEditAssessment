@@ -316,6 +316,9 @@ class WebhookProcessor
             type: 'generation_charge',
             generation: $generation,
             description: "Generation charge for {$generation->size->value} {$generation->quality->value} image",
+            // Billed on the day Pixelforge completed it, which can differ from when the
+            // webhook (or a poll) reached us, e.g. across UTC midnight.
+            occurredAt: $generation->pixelforge_completed_at,
         );
     }
 }

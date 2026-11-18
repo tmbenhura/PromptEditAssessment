@@ -41,7 +41,9 @@ bcmath, never floats. Actual cost is computed from the `usage` and the `rates` P
 fixed for that generation: `tokens × rate ÷ 1,000,000` per token type, summed exactly,
 then `× 1.25` for the user. Provider cost is never rounded. The user price is exact to
 nine decimals (any finer fraction of a nanodollar is dropped). Failed generations are
-recorded at zero. The upfront figure is an estimate (a range plus a typical value); the
+recorded at zero. Pixelforge bills a generation on the UTC day it *completed*, so a charge
+transaction carries `occurred_at` (that completion time) alongside `created_at` (when we
+recorded it, possibly after midnight if the webhook was late). The upfront figure is an estimate (a range plus a typical value); the
 text and reasoning tokens are only known once the generation completes.
 
 **Balances.** Users start with $20 and can "buy" test credits. While a generation is

@@ -25,6 +25,7 @@ class TransactionFactory extends Factory
             'type' => 'purchase',
             'amount_usd' => '25.000000000',
             'description' => 'Credit purchase',
+            'occurred_at' => now(),
         ];
     }
 
@@ -36,6 +37,7 @@ class TransactionFactory extends Factory
             'type' => 'generation_charge',
             'amount_usd' => '-'.ltrim($amount, '-'),
             'description' => 'Image generation charge',
+            'occurred_at' => $generation->pixelforge_completed_at ?? now(),
         ]);
     }
 }

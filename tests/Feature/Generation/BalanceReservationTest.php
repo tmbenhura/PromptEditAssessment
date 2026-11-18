@@ -185,3 +185,39 @@ test('dashboard shows the available balance and what is held', function () {
             ->where('availableBalance', '9.250000000')
         );
 });
+
+test('a charge is dated by when Pixelforge completed the generation, not when we recorded it', function () {
+    // The webhook reaches us on the next UTC day, after Pixelforge billed the generation.
+    $this->travelTo(\Carbon\CarbonImmutable::parse('2026-03-02 00:05:00', 'UTC'));
+
+    $user = User::factory()->create(['balance_usd' => '10.000000000']);
+    $generation = Generation::factory()->create([
+        'user_id' => $user->id,
+        'status' => GenerationStatus::Processing,
+        'reserved_user_cost' => '1.000000000',
+    ]);
+
+    app(WebhookProcessor::class)->applyGenerationUpdate($generation, [
+        'id' => $generation->pixelforge_id,
+        'status' => 'succeeded',
+        'completed_at' => '2026-03-01T23:59:58Z',
+        'usage' => ['input_text_tokens' => 10, 'input_image_tokens' => 0, 'output_tokens' => 280, 'reasoning_tokens' => 100],
+        'rates' => ['input_text_tokens' => '5.00', 'input_image_tokens' => '10.00', 'output_tokens' => '40.00', 'reasoning_tokens' => '12.50'],
+    ]);
+
+    $charge = $user->transactions()->where('type', 'generation_charge')->sole();
+
+    expect($charge->occurred_at->utc()->toDateTimeString())->toBe('2026-03-01 23:59:58')
+        ->and($charge->created_at->utc()->toDateString())->toBe('2026-03-02')
+        // Same UTC day as the generation, which is what the usage report groups by.
+        ->and($charge->occurred_at->utc()->toDateString())
+        ->toBe($generation->fresh()->pixelforge_completed_at->utc()->toDateString());
+});
+
+test('a purchase happens when it is made', function () {
+    $user = User::factory()->create();
+
+    $transaction = $user->adjustBalance('5.000000000', 'purchase');
+
+    expect($transaction->occurred_at->diffInSeconds(now()))->toBeLessThan(5);
+});

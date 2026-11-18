@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
  * @property string $type
  * @property numeric-string $amount_usd
  * @property string|null $description
+ * @property Carbon $occurred_at When the money moved: for a generation charge, when Pixelforge completed it (its billing time), not when we recorded it
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read User $user
@@ -27,6 +28,7 @@ use Illuminate\Support\Carbon;
     'type',
     'amount_usd',
     'description',
+    'occurred_at',
 ])]
 class Transaction extends Model
 {
@@ -40,6 +42,7 @@ class Transaction extends Model
     {
         return [
             'amount_usd' => 'decimal:9',
+            'occurred_at' => 'datetime',
         ];
     }
 

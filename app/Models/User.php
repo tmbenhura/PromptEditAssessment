@@ -111,14 +111,17 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 
     /**
      * @param  numeric-string  $amountUsd
+     * @param  \DateTimeInterface|null  $occurredAt  When the money moved, if that isn't now. A
+     *                                              generation is billed when Pixelforge completed it.
      */
     public function adjustBalance(
         string $amountUsd,
         string $type,
         ?Generation $generation = null,
         ?string $description = null,
+        ?\DateTimeInterface $occurredAt = null,
     ): Transaction {
-        return DB::transaction(function () use ($amountUsd, $type, $generation, $description) {
+        return DB::transaction(function () use ($amountUsd, $type, $generation, $description, $occurredAt) {
             $user = User::query()->where('id', $this->id)->lockForUpdate()->firstOrFail();
             $newBalance = bcadd($user->balance_usd ?? '0.000000000', $amountUsd, 9);
 
@@ -133,6 +136,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
                 'type' => $type,
                 'amount_usd' => $amountUsd,
                 'description' => $description,
+                'occurred_at' => $occurredAt ?? now(),
             ]);
         });
     }
