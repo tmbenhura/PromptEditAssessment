@@ -112,7 +112,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     /**
      * @param  numeric-string  $amountUsd
      * @param  \DateTimeInterface|null  $occurredAt  When the money moved, if that isn't now. A
-     *                                              generation is billed when Pixelforge completed it.
+     *                                               generation is billed when Pixelforge completed it.
      */
     public function adjustBalance(
         string $amountUsd,

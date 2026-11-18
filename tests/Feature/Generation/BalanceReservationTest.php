@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\Pixelforge\PixelforgeClient;
 use App\Services\Pricing\CostCalculator;
 use App\Services\Webhooks\WebhookProcessor;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
@@ -188,7 +189,7 @@ test('dashboard shows the available balance and what is held', function () {
 
 test('a charge is dated by when Pixelforge completed the generation, not when we recorded it', function () {
     // The webhook reaches us on the next UTC day, after Pixelforge billed the generation.
-    $this->travelTo(\Carbon\CarbonImmutable::parse('2026-03-02 00:05:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse('2026-03-02 00:05:00', 'UTC'));
 
     $user = User::factory()->create(['balance_usd' => '10.000000000']);
     $generation = Generation::factory()->create([
