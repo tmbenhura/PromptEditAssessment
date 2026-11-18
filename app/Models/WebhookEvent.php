@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -27,6 +28,8 @@ use Illuminate\Support\Carbon;
     'outcome',
     'generation_id',
     'error',
+    'delivery_count',
+    'last_received_at',
     'processed_at',
 ])]
 class WebhookEvent extends Model
@@ -41,8 +44,8 @@ class WebhookEvent extends Model
     /**
      * Events last received before the cutoff (the retention period, in days).
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<self>  $query
-     * @return \Illuminate\Database\Eloquent\Builder<self>
+     * @param  Builder<self>  $query
+     * @return Builder<self>
      */
     public function scopeOlderThanDays($query, int $days)
     {

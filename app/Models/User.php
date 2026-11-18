@@ -122,7 +122,9 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             $user = User::query()->where('id', $this->id)->lockForUpdate()->firstOrFail();
             $newBalance = bcadd($user->balance_usd ?? '0.000000000', $amountUsd, 9);
 
-            $user->update(['balance_usd' => $newBalance]);
+            $user->balance_usd = $newBalance;
+            $user->save();
+
             $this->balance_usd = $newBalance;
 
             return Transaction::create([

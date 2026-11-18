@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\GenerationQuality;
 use App\Enums\GenerationSize;
 use App\Services\Pixelforge\PixelforgeClient;
+use App\Services\Pricing\CostCalculator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
