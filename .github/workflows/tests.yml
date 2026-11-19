@@ -12,6 +12,9 @@ permissions:
 jobs:
   ci:
     runs-on: ubuntu-24.04
+    environment:
+      name: ci
+      deployment: false
 
     steps:
       - name: Checkout code
@@ -35,4 +38,7 @@ jobs:
         run: composer setup
 
       - name: Run CI Checks
+        env:
+          PIXELFORGE_VERIFY_SSL: ${{ vars.PIXELFORGE_VERIFY_SSL }}
+          PIXELFORGE_API_KEY: ${{ secrets.PIXELFORGE_API_KEY }}
         run: composer ci:check
