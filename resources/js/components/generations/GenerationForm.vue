@@ -33,13 +33,13 @@ defineEmits<{
 }>();
 
 interface GenerationForm {
-    prompt: string,
-    size: string,
-    quality: string,
-    reference_images: string[],
-    balance?: number,
-    general?: string, 
-};
+    prompt: string;
+    size: string;
+    quality: string;
+    reference_images: string[];
+    balance?: number;
+    general?: string;
+}
 
 const form = useForm<GenerationForm>({
     prompt: '',

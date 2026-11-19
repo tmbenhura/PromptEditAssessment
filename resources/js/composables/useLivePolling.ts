@@ -23,7 +23,7 @@ export function useLivePolling(
     function sync() {
         if (isActive() && !timer) {
             timer = setInterval(() => {
-                router.reload({ only: propsToReload});
+                router.reload({ only: propsToReload });
             }, intervalMs);
         } else if (!isActive()) {
             stop();
