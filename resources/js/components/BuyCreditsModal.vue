@@ -63,15 +63,22 @@ function purchaseCredits() {
                     Buy Test Credits
                 </DialogTitle>
                 <DialogDescription>
-                    Add simulation credits to test Pixelforge image generations without real money.
+                    Add simulation credits to test Pixelforge image generations
+                    without real money.
                 </DialogDescription>
             </DialogHeader>
 
             <div class="space-y-4 py-2">
-                <div class="rounded-lg bg-neutral-50 p-3 text-sm dark:bg-neutral-900 border">
+                <div
+                    class="rounded-lg border bg-neutral-50 p-3 text-sm dark:bg-neutral-900"
+                >
                     <div class="flex items-center justify-between">
-                        <span class="text-neutral-600 dark:text-neutral-400">Current Balance:</span>
-                        <span class="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                        <span class="text-neutral-600 dark:text-neutral-400"
+                            >Current Balance:</span
+                        >
+                        <span
+                            class="font-mono font-semibold text-emerald-600 dark:text-emerald-400"
+                        >
                             {{ formatUsd(currentBalance, 4) }} USD
                         </span>
                     </div>
@@ -104,7 +111,11 @@ function purchaseCredits() {
                     class="gap-2"
                     @click="purchaseCredits"
                 >
-                    <Loader2 v-if="isPurchasing" aria-hidden="true" class="h-4 w-4 animate-spin motion-reduce:animate-none" />
+                    <Loader2
+                        v-if="isPurchasing"
+                        aria-hidden="true"
+                        class="h-4 w-4 animate-spin motion-reduce:animate-none"
+                    />
                     <span>Confirm +${{ selectedAmount }} Credits</span>
                 </Button>
             </DialogFooter>

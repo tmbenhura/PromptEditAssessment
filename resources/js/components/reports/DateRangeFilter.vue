@@ -39,7 +39,9 @@ const endDate = defineModel<string>('endDate', { required: true });
                 :aria-describedby="error ? errorId : undefined"
             />
         </div>
-        <span class="text-neutral-600 dark:text-neutral-400" aria-hidden="true">to</span>
+        <span class="text-neutral-600 dark:text-neutral-400" aria-hidden="true"
+            >to</span
+        >
         <label :for="`${idPrefix}-end`" class="sr-only">End date</label>
         <Input
             :id="`${idPrefix}-end`"
@@ -50,10 +52,27 @@ const endDate = defineModel<string>('endDate', { required: true });
             :aria-invalid="error ? 'true' : undefined"
             :aria-describedby="error ? errorId : undefined"
         />
-        <Button type="submit" size="sm" variant="outline" :disabled="isLoading" class="gap-1.5">
-            <RefreshCw v-if="isLoading" aria-hidden="true" class="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
+        <Button
+            type="submit"
+            size="sm"
+            variant="outline"
+            :disabled="isLoading"
+            class="gap-1.5"
+        >
+            <RefreshCw
+                v-if="isLoading"
+                aria-hidden="true"
+                class="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+            />
             <span>Filter</span>
         </Button>
-        <p v-if="error" :id="errorId" role="alert" class="w-full text-xs font-medium text-rose-600 dark:text-rose-400">{{ error }}</p>
+        <p
+            v-if="error"
+            :id="errorId"
+            role="alert"
+            class="w-full text-xs font-medium text-rose-600 dark:text-rose-400"
+        >
+            {{ error }}
+        </p>
     </form>
 </template>

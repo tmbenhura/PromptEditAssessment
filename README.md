@@ -41,7 +41,7 @@ bcmath, never floats. Actual cost is computed from the `usage` and the `rates` P
 fixed for that generation: `tokens × rate ÷ 1,000,000` per token type, summed exactly,
 then times the markup (`PIXELFORGE_MARKUP_MULTIPLIER`, default `1.25`) for the user. Provider cost is never rounded. The user price is exact to
 nine decimals (any finer fraction of a nanodollar is dropped). Failed generations are
-recorded at zero. Pixelforge bills a generation on the UTC day it *completed*, so a charge
+recorded at zero. Pixelforge bills a generation on the UTC day it _completed_, so a charge
 transaction carries `occurred_at` (that completion time) alongside `created_at` (when we
 recorded it, possibly after midnight if the webhook was late). The upfront figure is an estimate (a range plus a typical value); the
 text and reasoning tokens are only known once the generation completes.
@@ -51,7 +51,7 @@ text and reasoning tokens are only known once the generation completes.
 never a provider cost, rate or the multiplier. Generation records sent to the browser hide
 the provider cost, rates and idempotency key. Only the admin report shows the markup.
 
-**Pricing.** Estimates and the credit hold use Pixelforge's published rates *and* token
+**Pricing.** Estimates and the credit hold use Pixelforge's published rates _and_ token
 tables (`GET /v1/pricing`), cached for `PIXELFORGE_PRICING_CACHE_SECONDS`. Every distinct
 version is saved in `pricing_snapshots`. If Pixelforge can't be reached, the last pricing
 it confirmed is used; there are no built-in default rates. With nothing stored, new
@@ -89,12 +89,12 @@ estimated and actual cost and the image, and an "Image expired" state once Pixel
 
 **Operator report** (`/reports`, admins only). Per UTC day and per user: what users were
 charged, what Pixelforge charged, and profit, reconciled against `GET /v1/usage`.
-Generations are grouped by the day they *completed*, as Pixelforge bills them.
+Generations are grouped by the day they _completed_, as Pixelforge bills them.
 
 ## Deploying (Laravel Cloud or any host)
 
 1. Environment: `APP_KEY`, a real database, `PIXELFORGE_API_KEY`, `PIXELFORGE_WEBHOOK_SECRET`
-   (the secret belonging to *that* API key), and `QUEUE_CONNECTION=database` (or Redis).
+   (the secret belonging to _that_ API key), and `QUEUE_CONNECTION=database` (or Redis).
    Use a separate Pixelforge key per environment.
 2. Run a **queue worker** (`php artisan queue:work`) and the **scheduler**
    (`php artisan schedule:run` every minute). Generations never reach Pixelforge without
@@ -117,6 +117,6 @@ verification.
   `GET /v1/pricing`, or the last stored one during an outage. The charge always uses the rates
   Pixelforge returned for the generation itself.
 - **Lost create response.** If every attempt to create a generation fails, it is marked
-  failed at no cost. A response lost *and* never recovered by an idempotent retry could
+  failed at no cost. A response lost _and_ never recovered by an idempotent retry could
   leave an accepted generation un-billed locally; the reconcile command only resubmits
   generations that are still queued.

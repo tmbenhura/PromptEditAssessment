@@ -83,11 +83,17 @@ export function useCostEstimate(
                 return;
             }
 
-            console.error('Cost estimate request failed', response.status, body);
+            console.error(
+                'Cost estimate request failed',
+                response.status,
+                body,
+            );
 
             // Keep showing the last good estimate, unless pricing is unavailable.
             errorMessage.value =
-                body?.error ?? body?.message ?? 'The estimate could not be updated.';
+                body?.error ??
+                body?.message ??
+                'The estimate could not be updated.';
 
             if (response.status === 503) {
                 estimate.value = null;
@@ -125,7 +131,7 @@ export function useCostEstimate(
     // it couldn't (for example, pricing was unavailable when the page loaded).
     onMounted(() => {
         if (estimate.value === null) {
-            fetchEstimate();
+            fetchEstimate().catch(() => {});
         }
     });
 

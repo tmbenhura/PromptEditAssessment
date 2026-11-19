@@ -20,7 +20,7 @@ There is no real model. Images are abstract placeholders at the requested size, 
 
 ## Authentication
 
-Authenticate with an API key, sent as a bearer token. [Sign up](https://pixelforge.promptedit.dev/register), then create a key in the dashboard.  A key is shown once, when you create it, so store it somewhere safe. Revoked keys stop working immediately.
+Authenticate with an API key, sent as a bearer token. [Sign up](https://pixelforge.promptedit.dev/register), then create a key in the dashboard. A key is shown once, when you create it, so store it somewhere safe. Revoked keys stop working immediately.
 
 Each key has its own [webhook URL and signing secret](https://pixelforge.promptedit.dev/docs#webhooks) and its own [usage report](https://pixelforge.promptedit.dev/docs#usage). Use one key per environment (for example one for local development and one for your deployed app), so each environment only receives its own events and can reconcile its own costs.
 
@@ -53,28 +53,28 @@ jsonCopy
 }
 ```
 
-| Code | Type | Status | Meaning |
-| --- | --- | --- | --- |
-| `invalid_api_key` | `authentication_error` | 401 | The API key is missing, malformed or revoked. |
-| `validation_failed` | `invalid_request_error` | 422 | A parameter is missing or invalid. Unknown parameters are rejected, not ignored. See param and errors. |
-| `content_policy_violation` | `invalid_request_error` | 400 | The prompt was rejected. Nothing was created or billed. |
-| `not_found` | `invalid_request_error` | 404 | No such resource, or it belongs to another account (you can't tell which). |
-| `idempotency_key_reused` | `idempotency_error` | 409 | The Idempotency-Key was already used with different parameters. |
-| `rate_limit_exceeded` | `rate_limit_error` | 429 | Too many requests this minute. Wait for the seconds in the Retry-After header. |
-| `concurrency_limit_exceeded` | `rate_limit_error` | 429 | Too many generations queued or processing. Retry-After: 5. Retry once one finishes. |
-| `daily_limit_exceeded` | `rate_limit_error` | 429 | The daily generation quota (UTC) is used up. |
-| `overloaded` | `api_error` | 503 | Pixelforge is temporarily overloaded. Retry-After: 2. Nothing was created; retry, ideally with an Idempotency-Key. |
-| `date_range_too_long` | `invalid_request_error` | 422 | The usage date range covers too many days. |
+| Code                         | Type                    | Status | Meaning                                                                                                            |
+| ---------------------------- | ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------ |
+| `invalid_api_key`            | `authentication_error`  | 401    | The API key is missing, malformed or revoked.                                                                      |
+| `validation_failed`          | `invalid_request_error` | 422    | A parameter is missing or invalid. Unknown parameters are rejected, not ignored. See param and errors.             |
+| `content_policy_violation`   | `invalid_request_error` | 400    | The prompt was rejected. Nothing was created or billed.                                                            |
+| `not_found`                  | `invalid_request_error` | 404    | No such resource, or it belongs to another account (you can't tell which).                                         |
+| `idempotency_key_reused`     | `idempotency_error`     | 409    | The Idempotency-Key was already used with different parameters.                                                    |
+| `rate_limit_exceeded`        | `rate_limit_error`      | 429    | Too many requests this minute. Wait for the seconds in the Retry-After header.                                     |
+| `concurrency_limit_exceeded` | `rate_limit_error`      | 429    | Too many generations queued or processing. Retry-After: 5. Retry once one finishes.                                |
+| `daily_limit_exceeded`       | `rate_limit_error`      | 429    | The daily generation quota (UTC) is used up.                                                                       |
+| `overloaded`                 | `api_error`             | 503    | Pixelforge is temporarily overloaded. Retry-After: 2. Nothing was created; retry, ideally with an Idempotency-Key. |
+| `date_range_too_long`        | `invalid_request_error` | 422    | The usage date range covers too many days.                                                                         |
 
 ## Rate limits and quotas
 
 Limits apply per account, across all of its API keys.
 
-| Limit | Value | When exceeded |
-| --- | --- | --- |
-| Requests | 60 per minute | `429 rate_limit_exceeded`, with Retry-After |
+| Limit                  | Value                          | When exceeded                                      |
+| ---------------------- | ------------------------------ | -------------------------------------------------- |
+| Requests               | 60 per minute                  | `429 rate_limit_exceeded`, with Retry-After        |
 | Concurrent generations | 3 queued or processing at once | `429 concurrency_limit_exceeded`, with Retry-After |
-| Generations per day | 500 per UTC day | `429 daily_limit_exceeded` |
+| Generations per day    | 500 per UTC day                | `429 daily_limit_exceeded`                         |
 
 Rejected requests create nothing and cost nothing. Respect the `Retry-After` header (seconds) before retrying, and cap your retries: back off further each time, and give up after a few attempts rather than retrying forever. Every retry counts towards the per-minute limit.
 
@@ -92,13 +92,13 @@ Networks fail. To retry `POST /v1/generations` safely, send an `Idempotency-Key`
 
 POST/v1/generations
 
-| Parameter | Type | Description |
-| --- | --- | --- |
-| `prompt` | string, required | What to generate. At most 4,000 characters. |
-| `size` | string | `1024x1024` (default), `1536x1024` or `1024x1536`. |
-| `quality` | string | `low`, `medium` (default) or `high`. |
-| `reference_images` | array of URLs | Optional http(s) image URLs to guide the style, at most 4. Pixelforge doesn't download them, but each is billed as 765 input image tokens. |
-| `metadata` | object | Optional string keys to string values (at most 20 keys, values up to 500 characters). Returned on the generation and in every webhook, so you can match them to your own records. |
+| Parameter          | Type             | Description                                                                                                                                                                       |
+| ------------------ | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt`           | string, required | What to generate. At most 4,000 characters.                                                                                                                                       |
+| `size`             | string           | `1024x1024` (default), `1536x1024` or `1024x1536`.                                                                                                                                |
+| `quality`          | string           | `low`, `medium` (default) or `high`.                                                                                                                                              |
+| `reference_images` | array of URLs    | Optional http(s) image URLs to guide the style, at most 4. Pixelforge doesn't download them, but each is billed as 765 input image tokens.                                        |
+| `metadata`         | object           | Optional string keys to string values (at most 20 keys, values up to 500 characters). Returned on the generation and in every webhook, so you can match them to your own records. |
 
 Any other parameter is rejected with `422 validation_failed`, so a typo can't silently fall back to a default.
 
@@ -160,11 +160,11 @@ GET/v1/generations
 
 Your generations, newest first, with cursor pagination.
 
-| Query parameter | Description |
-| --- | --- |
-| `limit` | 1 to 100, default 20. |
-| `status` | Only generations with this status: `queued`, `processing`, `succeeded` or `failed`. |
-| `cursor` | The `next_cursor` from the previous page. |
+| Query parameter | Description                                                                         |
+| --------------- | ----------------------------------------------------------------------------------- |
+| `limit`         | 1 to 100, default 20.                                                               |
+| `status`        | Only generations with this status: `queued`, `processing`, `succeeded` or `failed`. |
+| `cursor`        | The `next_cursor` from the previous page.                                           |
 
 bashCopy
 
@@ -182,18 +182,18 @@ curl "https://pixelforge.promptedit.dev/v1/generations?limit=2&status=succeeded"
 
 ## The generation object
 
-| Field | Description |
-| --- | --- |
-| `id` | Unique id, prefixed `gen_`. |
-| `object` | Always `generation`. |
-| `status` | `queued`, `processing`, `succeeded` or `failed`. |
-| `prompt`, `size`, `quality`, `reference_images`, `metadata` | As requested, with defaults filled in. `metadata` is always an object (empty if none was sent). |
-| `image_url` | Signed PNG URL once succeeded, otherwise null. See [Images](https://pixelforge.promptedit.dev/docs#images). |
-| `image_url_expires_at` | When `image_url` stops working. |
-| `usage` | Null until succeeded, then `input_text_tokens`, `input_image_tokens`, `output_tokens`, `reasoning_tokens` and `total_tokens`. |
-| `rates` | The rates this generation is billed at, in US dollars per 1M tokens, with the same keys as `GET /v1/pricing`. Fixed when the generation is created, so later price changes don't affect it. |
-| `error` | Null unless failed, then `code` and `message`. |
-| `created_at`, `started_at`, `completed_at` | When it was accepted, started processing and finished (succeeded or failed). |
+| Field                                                       | Description                                                                                                                                                                                 |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                                        | Unique id, prefixed `gen_`.                                                                                                                                                                 |
+| `object`                                                    | Always `generation`.                                                                                                                                                                        |
+| `status`                                                    | `queued`, `processing`, `succeeded` or `failed`.                                                                                                                                            |
+| `prompt`, `size`, `quality`, `reference_images`, `metadata` | As requested, with defaults filled in. `metadata` is always an object (empty if none was sent).                                                                                             |
+| `image_url`                                                 | Signed PNG URL once succeeded, otherwise null. See [Images](https://pixelforge.promptedit.dev/docs#images).                                                                                 |
+| `image_url_expires_at`                                      | When `image_url` stops working.                                                                                                                                                             |
+| `usage`                                                     | Null until succeeded, then `input_text_tokens`, `input_image_tokens`, `output_tokens`, `reasoning_tokens` and `total_tokens`.                                                               |
+| `rates`                                                     | The rates this generation is billed at, in US dollars per 1M tokens, with the same keys as `GET /v1/pricing`. Fixed when the generation is created, so later price changes don't affect it. |
+| `error`                                                     | Null unless failed, then `code` and `message`.                                                                                                                                              |
+| `created_at`, `started_at`, `completed_at`                  | When it was accepted, started processing and finished (succeeded or failed).                                                                                                                |
 
 ### Lifecycle
 
@@ -252,12 +252,12 @@ Responses and webhooks report token usage only. Work out the cost yourself from 
 
 You pay per token, at a different rate for each kind of token. Only succeeded generations are billed.
 
-| Token type | Price per 1M tokens |
-| --- | --- |
-| Input text tokens | $5.00 |
-| Input image tokens | $10.00 |
-| Output tokens | $40.00 |
-| Reasoning tokens | $12.50 |
+| Token type         | Price per 1M tokens |
+| ------------------ | ------------------- |
+| Input text tokens  | $5.00               |
+| Input image tokens | $10.00              |
+| Output tokens      | $40.00              |
+| Reasoning tokens   | $12.50              |
 
 Each generation is billed at the rates in force when it was created. Rates can change, so read them from the pricing endpoint rather than hardcoding them. It needs no authentication.
 
@@ -314,31 +314,31 @@ curl https://pixelforge.promptedit.dev/v1/pricing
 - **Input image tokens:** exactly 765 per reference image.
 - **Output tokens:** exact, by quality and size:
 
-| Quality | 1024x1024 | 1536x1024 | 1024x1536 |
-| --- | --- | --- | --- |
-| `low` | 280 | 420 | 420 |
-| `medium` | 1,100 | 1,650 | 1,650 |
-| `high` | 4,300 | 6,450 | 6,450 |
+| Quality  | 1024x1024 | 1536x1024 | 1024x1536 |
+| -------- | --------- | --------- | --------- |
+| `low`    | 280       | 420       | 420       |
+| `medium` | 1,100     | 1,650     | 1,650     |
+| `high`   | 4,300     | 6,450     | 6,450     |
 
 - **Reasoning tokens:** the model thinks before drawing, and how much varies per generation. The count is only known once the generation completes, but always falls within a range set by quality:
 
-| Quality | Minimum | Maximum |
-| --- | --- | --- |
-| `low` | 0 | 500 |
-| `medium` | 200 | 2,000 |
-| `high` | 1,000 | 8,000 |
+| Quality  | Minimum | Maximum |
+| -------- | ------- | ------- |
+| `low`    | 0       | 500     |
+| `medium` | 200     | 2,000   |
+| `high`   | 1,000   | 8,000   |
 
 ### Worked example: the most a generation can cost
 
 A `high` quality `1536x1024` image with a 400-character prompt and 2 reference images, assuming the most text and reasoning tokens possible:
 
-| Tokens | Count | × price per 1M | Cost |
-| --- | --- | --- | --- |
-| Input text 400 / 4 = 100 estimated, up to +15% | 115 | $5.00 | `0.000575000` |
-| Input image 2 × 765 | 1,530 | $10.00 | `0.015300000` |
-| Output high, 1536x1024 (exact) | 6,450 | $40.00 | `0.258000000` |
-| Reasoning maximum for high quality | 8,000 | $12.50 | `0.100000000` |
-| Maximum total | `0.373875000` ($0.373875) |
+| Tokens                                         | Count                     | × price per 1M | Cost          |
+| ---------------------------------------------- | ------------------------- | -------------- | ------------- |
+| Input text 400 / 4 = 100 estimated, up to +15% | 115                       | $5.00          | `0.000575000` |
+| Input image 2 × 765                            | 1,530                     | $10.00         | `0.015300000` |
+| Output high, 1536x1024 (exact)                 | 6,450                     | $40.00         | `0.258000000` |
+| Reasoning maximum for high quality             | 8,000                     | $12.50         | `0.100000000` |
+| Maximum total                                  | `0.373875000` ($0.373875) |
 
 Costs are exact: one token at $1.00 per 1M is $0.000001, and amounts are never rounded. Floating-point arithmetic will drift; use integers (for example nanodollars) or decimals.
 
@@ -396,14 +396,14 @@ curl "https://pixelforge.promptedit.dev/v1/usage?start_date=2026-11-01&end_date=
 
 ## Webhooks
 
-Each API key has its own webhook URL and signing secret. Whenever a generation changes status, Pixelforge sends an HTTP `POST` to the webhook URL of the key that created it, signed with that key's secret. Other keys never see the event.  Set each key's URL and copy its signing secret in the dashboard.
+Each API key has its own webhook URL and signing secret. Whenever a generation changes status, Pixelforge sends an HTTP `POST` to the webhook URL of the key that created it, signed with that key's secret. Other keys never see the event. Set each key's URL and copy its signing secret in the dashboard.
 
-| Event | Sent when |
-| --- | --- |
-| `generation.processing` | A generation leaves the queue. |
-| `generation.succeeded` | A generation finished, with `usage` and `image_url`. |
-| `generation.failed` | A generation failed, with `error`. |
-| `ping` | You pressed "Send test event" in the dashboard. |
+| Event                   | Sent when                                            |
+| ----------------------- | ---------------------------------------------------- |
+| `generation.processing` | A generation leaves the queue.                       |
+| `generation.succeeded`  | A generation finished, with `usage` and `image_url`. |
+| `generation.failed`     | A generation failed, with `error`.                   |
+| `ping`                  | You pressed "Send test event" in the dashboard.      |
 
 The body is an event whose `data.object` is the full [generation object](https://pixelforge.promptedit.dev/docs#generation-object) at the moment the event happened.
 
@@ -506,13 +506,13 @@ A succeeded generation's `image_url` points to a PNG at the requested size. The 
 
 Put any of these keywords anywhere in a prompt to trigger a behaviour on purpose. They are case-insensitive and still count toward the prompt's text tokens.
 
-| Keyword | Behaviour |
-| --- | --- |
-| `[blocked]` | Rejected at submission with 400 content\_policy\_violation. Nothing is created or billed. |
-| `[overloaded]` | Rejected at submission with 503 overloaded. Nothing is created or billed. |
-| `[fail]` | Accepted, then fails while processing (generation.failed). Not billed. |
-| `[succeed]` | Accepted and never fails at random. |
-| `[slow]` | Takes 60 to 90 seconds to process instead of 5 to 30. |
-| `[duplicate]` | Every webhook event for the generation is delivered twice. |
+| Keyword        | Behaviour                                                                                 |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| `[blocked]`    | Rejected at submission with 400 content\_policy\_violation. Nothing is created or billed. |
+| `[overloaded]` | Rejected at submission with 503 overloaded. Nothing is created or billed.                 |
+| `[fail]`       | Accepted, then fails while processing (generation.failed). Not billed.                    |
+| `[succeed]`    | Accepted and never fails at random.                                                       |
+| `[slow]`       | Takes 60 to 90 seconds to process instead of 5 to 30.                                     |
+| `[duplicate]`  | Every webhook event for the generation is delivered twice.                                |
 
 Without keywords, Pixelforge still misbehaves now and then, like a real provider: a small share of generations fail at random, a small share of create requests are rejected with `503 overloaded`, and some webhook events are deliberately delivered twice.

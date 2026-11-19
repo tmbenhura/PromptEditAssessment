@@ -32,7 +32,16 @@ defineEmits<{
     buyCredits: [];
 }>();
 
-const form = useForm({
+interface GenerationForm {
+    prompt: string,
+    size: string,
+    quality: string,
+    reference_images: string[],
+    balance?: number,
+    general?: string, 
+};
+
+const form = useForm<GenerationForm>({
     prompt: '',
     size: '1024x1024',
     quality: 'medium',
@@ -97,8 +106,12 @@ function submit() {
                 <div class="space-y-1.5">
                     <div class="flex items-center justify-between text-xs">
                         <Label for="prompt" class="font-medium">Prompt</Label>
-                        <span class="font-mono text-neutral-600 dark:text-neutral-400" aria-hidden="true">
-                            {{ form.prompt.length }} / {{ MAX_PROMPT_LENGTH.toLocaleString() }} chars
+                        <span
+                            class="font-mono text-neutral-600 dark:text-neutral-400"
+                            aria-hidden="true"
+                        >
+                            {{ form.prompt.length }} /
+                            {{ MAX_PROMPT_LENGTH.toLocaleString() }} chars
                         </span>
                     </div>
                     <textarea
@@ -108,11 +121,18 @@ function submit() {
                         required
                         :maxlength="MAX_PROMPT_LENGTH"
                         :aria-invalid="form.errors.prompt ? 'true' : undefined"
-                        :aria-describedby="form.errors.prompt ? 'prompt-error' : undefined"
+                        :aria-describedby="
+                            form.errors.prompt ? 'prompt-error' : undefined
+                        "
                         placeholder="A lighthouse on a cliff at dawn, dramatic waves, oil painting..."
-                        class="w-full rounded-md border border-input px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-neutral-900/50"
+                        class="w-full rounded-md border border-input px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:bg-neutral-900/50"
                     ></textarea>
-                    <div v-if="form.errors.prompt" id="prompt-error" role="alert" class="text-xs font-medium text-rose-600 dark:text-rose-400">
+                    <div
+                        v-if="form.errors.prompt"
+                        id="prompt-error"
+                        role="alert"
+                        class="text-xs font-medium text-rose-600 dark:text-rose-400"
+                    >
                         {{ form.errors.prompt }}
                     </div>
                 </div>
@@ -141,10 +161,18 @@ function submit() {
                     @buy-credits="$emit('buyCredits')"
                 />
 
-                <div v-if="form.errors.balance" role="alert" class="text-xs font-medium text-rose-600 dark:text-rose-400">
+                <div
+                    v-if="form.errors.balance"
+                    role="alert"
+                    class="text-xs font-medium text-rose-600 dark:text-rose-400"
+                >
                     {{ form.errors.balance }}
                 </div>
-                <div v-if="form.errors.general" role="alert" class="text-xs font-medium text-rose-600 dark:text-rose-400">
+                <div
+                    v-if="form.errors.general"
+                    role="alert"
+                    class="text-xs font-medium text-rose-600 dark:text-rose-400"
+                >
                     {{ form.errors.general }}
                 </div>
             </CardContent>
@@ -153,13 +181,22 @@ function submit() {
                 <Button
                     type="submit"
                     class="w-full cursor-pointer gap-2 bg-lime-400 py-5 text-neutral-950 hover:bg-lime-300 focus-visible:ring-emerald-600"
-                    :disabled="form.processing || !form.prompt.trim() || !canAfford"
+                    :disabled="
+                        form.processing || !form.prompt.trim() || !canAfford
+                    "
                 >
-                    <Loader2 v-if="form.processing" aria-hidden="true" class="h-4 w-4 animate-spin motion-reduce:animate-none" />
+                    <Loader2
+                        v-if="form.processing"
+                        aria-hidden="true"
+                        class="h-4 w-4 animate-spin motion-reduce:animate-none"
+                    />
                     <Sparkles v-else aria-hidden="true" class="h-4 w-4" />
                     <span class="uppercase">
                         Generate
-                        <span v-if="estimate" class="font-normal text-neutral-800">
+                        <span
+                            v-if="estimate"
+                            class="font-normal text-neutral-800"
+                        >
                             ≈ ${{ Number(estimate.costs.typical).toFixed(4) }}
                         </span>
                     </span>

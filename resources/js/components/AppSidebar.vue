@@ -17,9 +17,9 @@ import {
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 import { computed } from 'vue';
-import { usePage } from '@inertiajs/vue3'
+import { usePage } from '@inertiajs/vue3';
 
-const page = usePage()
+const page = usePage();
 const baseMainNavItems: NavItem[] = [
     {
         title: 'Studio',
@@ -30,11 +30,15 @@ const baseMainNavItems: NavItem[] = [
         title: 'Financial Reports',
         href: '/reports',
         icon: BarChart3,
-        adminOnly: true
+        adminOnly: true,
     },
 ];
 
-const mainNavItems = computed(() => baseMainNavItems.filter(menuItem => page.props.auth.user.is_admin || !menuItem.adminOnly))
+const mainNavItems = computed(() =>
+    baseMainNavItems.filter(
+        (menuItem) => page.props.auth.user.is_admin || !menuItem.adminOnly,
+    ),
+);
 const footerNavItems: NavItem[] = [
     {
         title: 'Repository',

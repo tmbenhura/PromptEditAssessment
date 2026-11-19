@@ -40,20 +40,31 @@ const imageExpired = computed(
 </script>
 
 <template>
-    <div class="relative flex h-48 items-center justify-center overflow-hidden border-b bg-neutral-100 dark:bg-neutral-900 sm:w-48 sm:min-w-[192px] sm:border-b-0 sm:border-r">
+    <div
+        class="relative flex h-48 items-center justify-center overflow-hidden border-b bg-neutral-100 sm:w-48 sm:min-w-[192px] sm:border-r sm:border-b-0 dark:bg-neutral-900"
+    >
         <div
             v-if="generation.status === 'succeeded' && imageExpired"
             class="flex flex-col items-center gap-1.5 p-4 text-center"
         >
             <ImageOff aria-hidden="true" class="h-7 w-7 text-neutral-500" />
-            <span class="text-xs font-semibold text-neutral-600 dark:text-neutral-300">Image expired</span>
-            <span class="text-[11px] text-neutral-600 dark:text-neutral-400">Pixelforge links last 24 hours</span>
+            <span
+                class="text-xs font-semibold text-neutral-600 dark:text-neutral-300"
+                >Image expired</span
+            >
+            <span class="text-[11px] text-neutral-600 dark:text-neutral-400"
+                >Pixelforge links last 24 hours</span
+            >
         </div>
 
-        <template v-else-if="generation.status === 'succeeded' && generation.image_url">
+        <template
+            v-else-if="
+                generation.status === 'succeeded' && generation.image_url
+            "
+        >
             <button
                 type="button"
-                class="group relative block h-full w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                class="group relative block h-full w-full cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
                 aria-label="View full resolution image"
                 @click="$emit('preview', generation.image_url)"
             >
@@ -65,7 +76,7 @@ const imageExpired = computed(
                 />
                 <span
                     aria-hidden="true"
-                    class="absolute bottom-2 right-2 rounded-full bg-black/70 p-1.5 text-white backdrop-blur-xs transition group-hover:bg-black/90"
+                    class="absolute right-2 bottom-2 rounded-full bg-black/70 p-1.5 text-white backdrop-blur-xs transition group-hover:bg-black/90"
                 >
                     <ZoomIn class="h-3.5 w-3.5" />
                 </span>
@@ -73,24 +84,43 @@ const imageExpired = computed(
         </template>
 
         <div
-            v-else-if="generation.status === 'queued' || generation.status === 'processing'"
+            v-else-if="
+                generation.status === 'queued' ||
+                generation.status === 'processing'
+            "
             role="status"
             class="flex flex-col items-center gap-2 p-4 text-center"
         >
-            <Loader2 aria-hidden="true" class="h-7 w-7 animate-spin text-primary motion-reduce:animate-none" />
+            <Loader2
+                aria-hidden="true"
+                class="h-7 w-7 animate-spin text-primary motion-reduce:animate-none"
+            />
             <template v-if="waitingForQuota">
-                <span class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                <span
+                    class="text-xs font-medium text-neutral-600 dark:text-neutral-300"
+                >
                     Daily limit reached
                 </span>
-                <span class="text-[11px] text-neutral-600 dark:text-neutral-400">
-                    Starts automatically at {{ quotaResetTime }} (UTC day resets)
+                <span
+                    class="text-[11px] text-neutral-600 dark:text-neutral-400"
+                >
+                    Starts automatically at {{ quotaResetTime }} (UTC day
+                    resets)
                 </span>
             </template>
             <template v-else>
-                <span class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
-                    {{ generation.status === 'queued' ? 'In Queue' : 'Rendering Image...' }}
+                <span
+                    class="text-xs font-medium text-neutral-600 dark:text-neutral-300"
+                >
+                    {{
+                        generation.status === 'queued'
+                            ? 'In Queue'
+                            : 'Rendering Image...'
+                    }}
                 </span>
-                <span class="text-[11px] text-neutral-600 dark:text-neutral-400">Waiting</span>
+                <span class="text-[11px] text-neutral-600 dark:text-neutral-400"
+                    >Waiting</span
+                >
             </template>
         </div>
 
@@ -100,7 +130,9 @@ const imageExpired = computed(
         >
             <AlertCircle aria-hidden="true" class="h-7 w-7" />
             <span class="text-xs font-semibold">Generation Failed</span>
-            <span class="text-[11px] text-neutral-600 dark:text-neutral-400">No Charge</span>
+            <span class="text-[11px] text-neutral-600 dark:text-neutral-400"
+                >No Charge</span
+            >
         </div>
     </div>
 </template>

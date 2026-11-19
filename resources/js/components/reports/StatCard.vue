@@ -13,7 +13,9 @@ defineProps<{
 <template>
     <Card>
         <CardHeader class="flex flex-row items-center justify-between pb-2">
-            <CardTitle class="text-xs font-medium uppercase text-neutral-500">{{ title }}</CardTitle>
+            <CardTitle class="text-xs font-medium text-neutral-500 uppercase">{{
+                title
+            }}</CardTitle>
             <component :is="icon" class="h-4 w-4" :class="iconClass" />
         </CardHeader>
         <CardContent>

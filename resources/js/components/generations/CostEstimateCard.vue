@@ -27,7 +27,9 @@ function usd(amount: string, decimals: number): string {
         :aria-busy="isLoading"
     >
         <div class="flex items-center justify-between">
-            <span class="flex items-center gap-1.5 font-semibold text-neutral-700 dark:text-neutral-300">
+            <span
+                class="flex items-center gap-1.5 font-semibold text-neutral-700 dark:text-neutral-300"
+            >
                 <Coins aria-hidden="true" class="h-4 w-4 text-amber-500" />
                 Estimated Cost
             </span>
@@ -41,7 +43,13 @@ function usd(amount: string, decimals: number): string {
             </Badge>
         </div>
 
-        <p v-if="!estimate && !errorMessage" role="status" class="text-neutral-600 dark:text-neutral-400">Calculating…</p>
+        <p
+            v-if="!estimate && !errorMessage"
+            role="status"
+            class="text-neutral-600 dark:text-neutral-400"
+        >
+            Calculating…
+        </p>
 
         <template v-if="estimate">
             <div
@@ -49,10 +57,15 @@ function usd(amount: string, decimals: number): string {
                 :class="{ 'opacity-50': isLoading }"
             >
                 <div class="flex justify-between">
-                    <span>Input text tokens (~{{ estimate.tokens.text }}):</span>
+                    <span
+                        >Input text tokens (~{{ estimate.tokens.text }}):</span
+                    >
                     <span>{{ usd(estimate.costs.text, 6) }}</span>
                 </div>
-                <div v-if="estimate.tokens.image > 0" class="flex justify-between">
+                <div
+                    v-if="estimate.tokens.image > 0"
+                    class="flex justify-between"
+                >
                     <span>Ref image tokens ({{ estimate.tokens.image }}):</span>
                     <span>{{ usd(estimate.costs.image, 6) }}</span>
                 </div>
@@ -61,8 +74,15 @@ function usd(amount: string, decimals: number): string {
                     <span>{{ usd(estimate.costs.output, 6) }}</span>
                 </div>
                 <div class="flex justify-between">
-                    <span>Reasoning tokens ({{ estimate.tokens.reasoning_min }}-{{ estimate.tokens.reasoning_max }}):</span>
-                    <span>{{ usd(estimate.costs.reasoning_min, 6) }} - {{ usd(estimate.costs.reasoning_max, 6) }}</span>
+                    <span
+                        >Reasoning tokens ({{
+                            estimate.tokens.reasoning_min
+                        }}-{{ estimate.tokens.reasoning_max }}):</span
+                    >
+                    <span
+                        >{{ usd(estimate.costs.reasoning_min, 6) }} -
+                        {{ usd(estimate.costs.reasoning_max, 6) }}</span
+                    >
                 </div>
             </div>
 
@@ -70,9 +90,12 @@ function usd(amount: string, decimals: number): string {
                 class="flex items-center justify-between border-t pt-2 font-semibold transition-opacity"
                 :class="{ 'opacity-50': isLoading }"
             >
-                <span class="text-neutral-700 dark:text-neutral-200">Price Range:</span>
+                <span class="text-neutral-700 dark:text-neutral-200"
+                    >Price Range:</span
+                >
                 <span class="font-mono text-neutral-900 dark:text-neutral-100">
-                    {{ usd(estimate.costs.min, 4) }} – {{ usd(estimate.costs.max, 4) }}
+                    {{ usd(estimate.costs.min, 4) }} –
+                    {{ usd(estimate.costs.max, 4) }}
                 </span>
             </div>
         </template>
@@ -80,10 +103,15 @@ function usd(amount: string, decimals: number): string {
         <!-- Polite announcement of the headline figure whenever it settles. -->
         <p v-if="estimate" class="sr-only" role="status" aria-live="polite">
             Estimated cost about {{ usd(estimate.costs.typical, 4) }}, between
-            {{ usd(estimate.costs.min, 4) }} and {{ usd(estimate.costs.max, 4) }}.
+            {{ usd(estimate.costs.min, 4) }} and
+            {{ usd(estimate.costs.max, 4) }}.
         </p>
 
-        <p v-if="errorMessage" role="alert" class="flex items-center gap-1.5 text-rose-700 dark:text-rose-400">
+        <p
+            v-if="errorMessage"
+            role="alert"
+            class="flex items-center gap-1.5 text-rose-700 dark:text-rose-400"
+        >
             <AlertCircle aria-hidden="true" class="h-4 w-4 shrink-0" />
             {{ errorMessage }}
         </p>
@@ -99,7 +127,7 @@ function usd(amount: string, decimals: number): string {
             </div>
             <button
                 type="button"
-                class="ml-2 rounded px-1 text-xs font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="ml-2 rounded px-1 text-xs font-semibold underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 @click="$emit('buyCredits')"
             >
                 Buy

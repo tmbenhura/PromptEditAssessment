@@ -36,11 +36,18 @@ const selectedAmount = defineModel<number>({ required: true });
                         : 'border-neutral-400 dark:border-neutral-500'
                 "
             >
-                <Check v-if="selectedAmount === tier.amount" class="h-3 w-3 stroke-[3]" />
+                <Check
+                    v-if="selectedAmount === tier.amount"
+                    class="h-3 w-3 stroke-[3]"
+                />
             </div>
             <div>
-                <div class="font-medium text-neutral-900 dark:text-neutral-100">{{ tier.label }}</div>
-                <div class="text-xs text-neutral-600 dark:text-neutral-400">{{ tier.description }}</div>
+                <div class="font-medium text-neutral-900 dark:text-neutral-100">
+                    {{ tier.label }}
+                </div>
+                <div class="text-xs text-neutral-600 dark:text-neutral-400">
+                    {{ tier.description }}
+                </div>
             </div>
         </div>
 

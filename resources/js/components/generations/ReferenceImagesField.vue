@@ -35,31 +35,41 @@ function addImageUrl() {
 }
 
 function removeImageUrl(index: number) {
-    imageUrls.value = imageUrls.value.filter((_, position) => position !== index);
+    imageUrls.value = imageUrls.value.filter(
+        (_, position) => position !== index,
+    );
 }
 </script>
 
 <template>
     <div class="space-y-2">
         <div class="flex items-center justify-between text-xs">
-            <Label :for="urlInputId" class="font-medium">Reference Images (Optional)</Label>
+            <Label :for="urlInputId" class="font-medium"
+                >Reference Images (Optional)</Label
+            >
             <span class="text-[11px] text-neutral-600 dark:text-neutral-400">
                 {{ imageUrls.length }}/{{ MAX_REFERENCE_IMAGES }} max
             </span>
         </div>
 
-        <ul v-if="imageUrls.length > 0" class="space-y-1.5" aria-label="Reference images">
+        <ul
+            v-if="imageUrls.length > 0"
+            class="space-y-1.5"
+            aria-label="Reference images"
+        >
             <li
                 v-for="(imageUrl, index) in imageUrls"
                 :key="imageUrl"
                 class="flex items-center justify-between rounded border bg-neutral-50 px-2 py-1 text-xs dark:bg-neutral-900"
             >
-                <span class="max-w-[240px] truncate font-mono text-[11px] text-neutral-600 dark:text-neutral-300">
+                <span
+                    class="max-w-[240px] truncate font-mono text-[11px] text-neutral-600 dark:text-neutral-300"
+                >
                     {{ imageUrl }}
                 </span>
                 <button
                     type="button"
-                    class="rounded p-1 text-neutral-500 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-neutral-400"
+                    class="rounded p-1 text-neutral-500 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:text-neutral-400"
                     :aria-label="`Remove reference image ${index + 1}`"
                     @click="removeImageUrl(index)"
                 >
@@ -91,7 +101,14 @@ function removeImageUrl(index: number) {
                     Add
                 </Button>
             </div>
-            <p v-if="urlError" :id="urlErrorId" role="alert" class="text-xs font-medium text-rose-600 dark:text-rose-400">{{ urlError }}</p>
+            <p
+                v-if="urlError"
+                :id="urlErrorId"
+                role="alert"
+                class="text-xs font-medium text-rose-600 dark:text-rose-400"
+            >
+                {{ urlError }}
+            </p>
         </div>
     </div>
 </template>

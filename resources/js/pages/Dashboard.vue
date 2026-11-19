@@ -34,13 +34,16 @@ defineOptions({
 const isBuyCreditsOpen = ref(false);
 const previewImageUrl = ref<string | null>(null);
 
-useLivePolling(() => props.hasActiveGenerations, [
-    'generations',
-    'hasActiveGenerations',
-    'balance',
-    'availableBalance',
-    'heldBalance',
-]);
+useLivePolling(
+    () => props.hasActiveGenerations,
+    [
+        'generations',
+        'hasActiveGenerations',
+        'balance',
+        'availableBalance',
+        'heldBalance',
+    ],
+);
 </script>
 
 <template>
@@ -77,7 +80,13 @@ useLivePolling(() => props.hasActiveGenerations, [
         </div>
     </div>
 
-    <BuyCreditsModal v-model:open="isBuyCreditsOpen" :current-balance="balance" />
+    <BuyCreditsModal
+        v-model:open="isBuyCreditsOpen"
+        :current-balance="balance"
+    />
 
-    <ImagePreviewDialog :image-url="previewImageUrl" @close="previewImageUrl = null" />
+    <ImagePreviewDialog
+        :image-url="previewImageUrl"
+        @close="previewImageUrl = null"
+    />
 </template>

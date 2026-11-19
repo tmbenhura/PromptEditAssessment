@@ -32,6 +32,7 @@ Only once everything above works. Either or both earn bonus points:
 Some details are deliberately left open. When something is unclear, provide reasoned options and seek guidance.
 
 ## Coding
+
 - Prefer modern Laravel and PHP code.
 - Use DDD where applicable.
 - Laravel Boost has been setup, use it.

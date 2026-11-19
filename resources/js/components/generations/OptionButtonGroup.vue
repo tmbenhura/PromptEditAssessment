@@ -35,7 +35,10 @@ const groupName = `option-group-${useId()}`;
                     :value="option.value"
                 />
                 <span class="text-xs font-semibold">{{ option.label }}</span>
-                <span v-if="option.description" class="text-[11px] text-neutral-600 dark:text-neutral-400">
+                <span
+                    v-if="option.description"
+                    class="text-[11px] text-neutral-600 dark:text-neutral-400"
+                >
                     {{ option.description }}
                 </span>
             </label>
