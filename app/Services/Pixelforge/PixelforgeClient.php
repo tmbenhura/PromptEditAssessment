@@ -54,7 +54,7 @@ class PixelforgeClient
      * when to try again. Pass the same idempotency key on every attempt so a retry
      * can never create a second generation.
      *
-     * @param  array{
+     * @param array{
      *     prompt: string,
      *     size?: string,
      *     quality?: string,

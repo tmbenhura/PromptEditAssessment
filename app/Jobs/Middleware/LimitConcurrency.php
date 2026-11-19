@@ -4,6 +4,7 @@ namespace App\Jobs\Middleware;
 
 use Closure;
 use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -28,7 +29,7 @@ class LimitConcurrency
     ) {}
 
     /**
-     * @param  object  $job  The queued job (it uses InteractsWithQueue)
+     * @param  Job  $job  The queued job (it uses InteractsWithQueue)
      * @param  Closure(object): mixed  $next
      */
     public function handle(object $job, Closure $next): mixed

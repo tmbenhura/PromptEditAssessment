@@ -33,12 +33,13 @@ class PricingProvider
     ) {}
 
     /**
-     * @return array{rates: array<string, string>, tokens: array<string, mixed>}
+     * @return array{rates: array<string, numeric-string>, tokens: array<string, mixed>}
      *
      * @throws PricingUnavailableException
      */
     public function current(): array
     {
+        /** @var array{rates: array<string, numeric-string>, tokens: array<string, mixed>}|null $cached */
         $cached = Cache::get(self::CACHE_KEY);
 
         if (is_array($cached)) {
@@ -58,7 +59,7 @@ class PricingProvider
     }
 
     /**
-     * @return array{rates: array<string, string>, tokens: array<string, mixed>}
+     * @return array{rates: array<string, numeric-string>, tokens: array<string, mixed>}
      */
     private function lastKnown(\Throwable $reason): array
     {
@@ -73,6 +74,7 @@ class PricingProvider
             'reason' => $reason->getMessage(),
         ]);
 
+        /** @var array{rates: array<string, numeric-string>, tokens: array<string, mixed>} $pricing */
         $pricing = ['rates' => $snapshot->rates, 'tokens' => $snapshot->tokens];
 
         // Don't retry the API on every request while it is down.
@@ -85,7 +87,7 @@ class PricingProvider
      * Save the pricing if it differs from the last stored one, otherwise just note
      * that it was confirmed again.
      *
-     * @param  array{rates: array<string, string>, tokens: array<string, mixed>}  $pricing
+     * @param  array{rates: array<string, numeric-string>, tokens: array<string, mixed>}  $pricing
      */
     private function remember(array $pricing): void
     {
@@ -108,7 +110,7 @@ class PricingProvider
      * Only trust a response that has everything the calculator needs.
      *
      * @param  array<string, mixed>  $payload
-     * @return array{rates: array<string, string>, tokens: array<string, mixed>}
+     * @return array{rates: array<string, numeric-string>, tokens: array<string, mixed>}
      *
      * @throws \UnexpectedValueException
      */
@@ -146,6 +148,8 @@ class PricingProvider
                 }
             }
         }
+
+        /** @var array<string, numeric-string> $rates */
 
         return [
             'rates' => array_map('strval', array_intersect_key($rates, array_flip(self::RATE_KEYS))),

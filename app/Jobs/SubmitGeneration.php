@@ -204,7 +204,13 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     prompt: string,
+     *     size?: string,
+     *     quality?: string,
+     *     reference_images?: array<int, string>,
+     *     metadata?: array<string, string>,
+     * }
      */
     protected function payload(Generation $generation): array
     {

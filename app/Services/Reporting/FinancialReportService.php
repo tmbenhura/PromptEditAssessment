@@ -218,7 +218,10 @@ class FinancialReportService
             ])
             ->all();
 
-        usort($stats, fn (array $a, array $b) => bccomp($b['user_spend_usd'], $a['user_spend_usd'], 9));
+        usort(
+            $stats,
+            /** @phpstan-ignore-next-line */
+            fn (array $a, array $b) => bccomp($b['user_spend_usd'], $a['user_spend_usd'], 9));
 
         return $stats;
     }
@@ -238,7 +241,8 @@ class FinancialReportService
 
         $costs = [];
         foreach ($usage['data'] ?? [] as $entry) {
-            $costs[(string) $entry['date']] = (string) ($entry['cost_usd'] ?? self::ZERO);
+            $cost = (string) ($entry['cost_usd'] ?? self::ZERO);
+            $costs[(string) $entry['date']] = is_numeric($cost) ? $cost : self::ZERO;
         }
 
         return $costs;

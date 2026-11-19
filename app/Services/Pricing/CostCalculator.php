@@ -17,6 +17,7 @@ class CostCalculator
      */
     public function markupMultiplier(): string
     {
+        /** @var numeric-string $multiplier */
         $multiplier = trim((string) (config('services.pixelforge.markup_multiplier') ?? '1.25'));
 
         if (! preg_match('/^\d+(\.\d+)?$/', $multiplier) || bccomp($multiplier, '0', 9) <= 0) {
@@ -185,7 +186,7 @@ class CostCalculator
      * be worked out from it.
      *
      * @param  array<int, string>  $referenceImages
-     * @param  array{rates: array<string, string>, tokens: array<string, mixed>}  $pricing
+     * @param  array{rates: array<string, numeric-string>, tokens: array<string, mixed>}  $pricing
      * @return array{
      *     tokens: array{text: int, image: int, output: int, reasoning_min: int, reasoning_max: int},
      *     costs: array{
